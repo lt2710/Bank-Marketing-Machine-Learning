@@ -1,0 +1,475 @@
+---
+title: "Predicting subscriptions with bank direct marketing data"
+author: "Langyi Tian"
+date: "Nov 2019"
+output:
+  xaringan::moon_reader:
+    css: ["default", "default-fonts", "custom_Xaringan.css"]
+    lib_dir: libs
+    keep_md: true
+    self_contained: false
+    nature:
+      ratio: 16:9
+      highlightStyle: github
+      highlightLines: true
+editor_options: 
+  chunk_output_type: inline
+---
+exclude: true
+
+class: left, top
+background-image: url(images/roadmap.png)
+background-size: 100%
+background-position: 50% 280%
+
+```{r setup, include=FALSE}
+#Set up default knitr chunk options
+library("knitr")
+knitr::opts_chunk$set(
+  echo = FALSE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.height = 5,
+  fig.width = 12,
+  fig.align = "center",
+  cache = TRUE,
+  cache.lazy = FALSE
+)
+knitr::opts_knit$set(root.dir = "C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning")
+options(htmltools.dir.version = FALSE)
+setwd("C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning")
+```  
+
+```{r theme-map, include=FALSE}
+#set up theme map
+theme_simplemap <- function(base_size = 9,
+                            base_family = "") {
+  theme_bw(base_size = base_size, base_family = base_family) %+replace%
+    theme(
+      axis.line = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title = element_blank(),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0, "lines"),
+      plot.background = element_blank(),
+      legend.position = "none"
+    )
+}
+```
+
+```{r load packages}
+#load packages.
+packages <- c(
+  "GGally",
+  "caret",
+  "corrplot",
+  "data.table",
+  "pROC",
+  "tidyverse",
+  "stringr",
+  "knitr",
+  "ggplot2",
+  "gridExtra",
+  "FactoMineR",
+  "factoextra",
+  "RColorBrewer"
+)
+packages <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+```
+
+```{r import data}
+dta <- read.csv("Casestudydata.csv",
+                stringsAsFactors = FALSE)
+names(dta)[1] <- "age"#correct variable name from encoding error
+head(dta,5)
+```
+
+```{r brief summary of variables}
+print("summary of variables")
+#functionalities to print summary for different var types
+for (i in names(dta)) {
+  print(i)
+  #transform integers to numeric
+  if (class(dta[[i]]) == "integer") {
+    dta[[i]] <- dta[[i]] %>% as.numeric()
+    print("var type changed from integer to numeric")
+  }
+  #print tables for character vector, summaries for numeric vectors
+  if (class(dta[[i]]) == "numeric") {
+    summary(dta[[i]]) %>% print()
+  } else if (class(dta[[i]]) == "character") {
+    table(dta[[i]]) %>% print()
+  }
+}
+```
+
+```{r}
+dta<-dta[rowSums(is.na(dta)) != ncol(dta),]#delete totally missing rows
+dta<-dta%>%distinct()#keep only distinct rows
+dta<-dta%>%select(-duration)#remove duration
+```
+
+---
+##Project summary
+
+ - Mission: Predicting client subscription to a term product
+ 
+ - Data: Direct marketing campaign results
+
+ - Exploratory data analysis:
+ 
+MCA with categorical variables, correlation matrix and PCA with numerics
+
+ - Data preprocessing:
+ 
+Missing value imputation, one hot encoding, scaling, train/test split, under-sampling training set
+
+ - Model training and comparison:
+ 
+Logistic regression, support vector machine, random forest
+
+ - Model selection:
+ 
+Random forest (82% accuracy without hyperparameter tuning)
+ 
+ - Future use cases:
+
+1. Customer portraits supporting target marketing
+2. Predictive information product for campaign operations
+
+---
+##Some months and students linked with more subscription
+ - Totally missing rows and duplicate rows were removed first
+ - A MCA with all categorical variables
+```{r do mca}
+#MCA based on the data
+dta_mca <-  dta %>% select(
+  y,
+  job,
+  marital,
+  education,
+  default,
+  housing,
+  loan,
+  month,
+  day_of_week,
+  contact,
+  poutcome
+)
+dta_mca[dta_mca == "unknown"] <- NA
+mca_dta <- MCA(
+  dta_mca,
+  ncp = 5,
+  na.method = "Average",
+  method = "Burt",
+  graph = FALSE
+)
+```
+
+```{r visualize mca out}
+#Visualize MCA outcome
+fviz_mca_var(
+  mca_dta,
+  axes = c(1, 2),
+  choice = "var.cat",
+  repel = TRUE,
+  map = "symmetric",
+  shape.var = "circle",
+  col.var = "firebrick",
+) +
+  ggtitle("Multiple Correspondence Analysis with Burt Method") +
+  labs(caption = "Source: a Portuguese banking institution") +
+  theme_classic()
+```
+ - Overall, 4639 out of 41179 (11%) subscribed
+ - On top right, more calls at March (51%), Sep (44%), Oct (44%), Dec (49%) led to subscription
+ - 31% student subscribed, among the top in job categories
+
+---
+##Correlated macroeconomic indicators
+```{r correlation plot}
+ggcorr(
+  dta %>% select(
+    age,
+    campaign,
+    pdays,
+    previous,
+    cons.conf.idx,
+    emp.var.rate,
+    cons.price.idx,
+    euribor3m,
+    nr.employed
+  ),
+  method = c("pairwise", "pearson"),
+  label = TRUE
+) +
+  ggtitle("Pairwise Pearson correlation plot of numeric variables") +
+  labs(caption = "Source: a Portuguese banking institution")
+```
+ - Macroecononmics indicators are highly correlated, PCA can be a solution
+
+---
+##Correlated macroeconomic indicators: PCA as a solution
+```{r pca}
+#Perform PCA
+pcout <- prcomp(
+  dta %>% select(
+    emp.var.rate,
+    cons.price.idx,
+    cons.conf.idx,
+    euribor3m,
+    nr.employed
+  ) %>% na.exclude(),
+  scale. = TRUE
+)
+biplot(pcout, scale = 0)
+```
+
+ - Consumer confidence index relatively independent in PCA
+
+---
+##Need to normalize and drop pdays
+```{r plot var summary}
+#Plot summary of a few important variables
+summary.variable <- function(varname,
+                             daata=dta) {
+  #For numeric and integer variables
+  if (class(daata[[varname]]) %in% c("numeric", "integer",
+                                     "character")) {
+    m <- ggplot(data = daata) +
+      geom_histogram(aes(x = daata[[varname]]),
+                stat = "bin",
+                fill = "firebrick") +
+      xlab(paste(varname)) +
+      ylab("Cases") +
+      theme_classic() 
+  }
+  return(m)
+}
+
+var_plots <- lapply(c("age",
+                      "campaign",
+                      "pdays",
+                      "previous"), summary.variable)
+grid.arrange(var_plots[[1]],
+             var_plots[[2]],
+             var_plots[[3]],
+             var_plots[[4]])
+```
+
+ - pdays contains little information, dropped in subsequent analysis
+ 
+ - Other variables right skewed, will be normalized later on
+ 
+```{r drop pdays}
+dta<-dta%>%select(-pdays)
+```
+
+---
+##Transformations and missing value imputation
+ - One hot encoding all categorical variables
+ 
+ - Transform binary variables into dummies
+ 
+ - Impute missing ages and CPI with average values (~5400 values replaced)
+
+##Train/test split and preprocessing
+ - 0.8 train/test random split, training set contains 32,943 obs
+ 
+ - After split, centering and scaling both samples to keep the training set "independent"
+ 
+ - Further under-sampling training set to have a half-half balance between "no" and "yes" in y
+ 
+ - Final training set contains 7,424 obs
+
+```{r one hot and dummy encoding}
+for (i in c("job",
+            "marital",
+            "education",
+            "contact",
+            "month",
+            "day_of_week",
+            "poutcome")) {
+  for (level in unique(dta[[i]])) {
+    dta[[paste(i, level, sep = "_")]] <- ifelse(dta[[i]] == level, 1, 0)
+  }
+  dta[[i]]<-NULL
+}
+
+for (i in c("default",
+            "housing",
+            "loan",
+            "y")) {
+  dta[[paste(i, "_yes", sep = "")]] <- ifelse(dta[[i]] == "yes", 1, 0)
+  dta[[i]]<-NULL
+}
+```
+
+```{r}
+dta$y_yes<-dta$y_yes%>%as.factor()
+dta$age[is.na(dta$age)] = mean(dta$age, na.rm=TRUE)#impute missing age with average
+dta$cons.price.idx[is.na(dta$cons.price.idx)] = mean(dta$cons.price.idx, na.rm=TRUE)#impute missing CPI with average
+```
+
+```{r preprocessing}
+#Splitting
+set.seed(0)
+training_size <- floor(0.80 * nrow(dta))
+train_ind <- sample(seq_len(nrow(dta)), size = training_size)
+training <- dta[train_ind, ]
+testing <- dta[-train_ind, ]
+
+#Normalizing
+preProcValues <- preProcess(training, method = c("center", "scale"))
+scaled.training <- predict(preProcValues, training)
+scaled.testing <- predict(preProcValues, testing)
+
+#Sampling
+set.seed(0)
+down_training <- downSample(x = scaled.training[, -ncol(scaled.training)],
+                            y = scaled.training$y_yes)
+
+```
+
+---
+##Model 1: Logistic regressions 
+ - Baseline, generalist model
+
+```{r train logit, eval=FALSE}
+# creating the classifier
+classifier.lm <- train(
+  Class ~ .,
+  data = down_training,
+  method = "glm",
+  na.action = na.omit,
+  family = "binomial"
+)
+save(classifier.lm,file="classifierlm.RData")
+```
+
+```{r test logit}
+load("classifierlm.RData")
+pred.lm <-
+  predict(classifier.lm, 
+          newdata = scaled.testing[-ncol(scaled.testing)], 
+          type="raw",
+          na.action = na.omit)
+caret::confusionMatrix(data = pred.lm, reference = scaled.testing$y_yes)
+```
+
+---
+##Model 2: Support vector machine
+ - Less overfitting, moderate dimensionality
+
+```{r train svm, eval=FALSE}
+trctrl <-
+  trainControl(method = "cv",
+               number = 10,
+               search='grid')
+set.seed(0)
+
+classifier.svm <-
+  train(
+    Class ~ .,
+    data = down_training,
+    method = "svmLinear",
+    trControl = trctrl,
+    na.action = na.omit,
+    tuneLength = 10
+  )
+save(classifier.svm,file="classifiersvm.RData")
+```
+
+```{r test svm}
+load("classifiersvm.RData")
+pred.svm <-
+  predict(classifier.svm, 
+          newdata = scaled.testing[-ncol(scaled.testing)], 
+          type="raw",
+          na.action = na.omit)
+caret::confusionMatrix(data = pred.svm, reference = scaled.testing$y_yes)
+```
+
+---
+##Model 3: Random forest
+ - Good for data mixed with categories and numerical, less overfitting
+
+```{r train rf,eval=FALSE}
+#Create control function for training with 10 folds and keep 3 folds for training. search method is grid.
+control <- trainControl(method='cv', 
+                        number=2,
+                        search = "grid")
+
+classifier.rf <- train(Class~.,
+    data = down_training,
+    method = "rf",
+    metric = "Accuracy",
+    trControl = control)
+# Print the results
+save(classifier.rf,file="classifierrf.RData")
+```
+
+```{r test rf}
+load("classifierrf.RData")
+pred.rf <-
+  predict(classifier.rf, 
+          newdata = scaled.testing[-ncol(scaled.testing)], 
+          type="raw",
+          na.action = na.omit)
+caret::confusionMatrix(data = pred.rf, reference = scaled.testing$y_yes)
+```
+
+---
+##Model choice: random forest
+ - Comparative accuracy (82%) compared with logit (81%) and SVM (83%) even without tuning, good ROC
+ 
+ - Fewer false negatives: help to minimize huge loss cases where potential subscribers are not identified 
+ 
+ - Good interpretability with the ability to return variable importance and visualize sample trees
+ 
+```{r roc rf}
+#Draw the ROC curve
+pred.rf.roc <-
+  predict(
+    classifier.rf,
+    newdata = scaled.testing[-ncol(scaled.testing)],
+    type = "prob",
+    na.action = na.omit
+  )
+rf.ROC <- roc(
+  predictor = pred.rf.roc$`1`,
+  response = scaled.testing$y_yes,
+  levels = rev(levels(scaled.testing$y_yes))
+)
+#Area under the curve: 0.8731
+plot(rf.ROC,
+     main = paste("Random Forest ROC: area under the curve ",rf.ROC$auc))
+```
+
+ - Next step: hyperparameter tuning and possibly compare with other tree algorithms (such as GBM)
+ 
+---
+##Future use cases
+ - For marketers: customer portraits supporting target marketing effort
+ 
+Knowing who to sell to helps business evolve from mass marketing to target marketing. A report on customer acquisision strategy regarding which kind of customers will have better likelihood to subscribe can be proposed. Customer persona can be generated from some models (such as the coeffecients of the logistics regression, or some sample tree structures of random forest). Delivered to marketers, it would support practices that approach target customer group better. For example, for a TV advertisement, it might be designed and personalized for students since they have a higher likelihood to subscribe among others.
+ 
+ - For sales: predictive information product during campaign event
+ 
+In direct marketing campaigns, call agents are in charge of outbound sales calls, who usually have to scroll through random and endless customer profiles. An end-user product (such as a dashboard or report connecting to the CRM system) providing a metric of "likelihood to subscribe" based on the CRM information would help them to prioritize the contact task (i.e. contact highly likely customers first), make the work more fun for them, and enhance the convertion rate of the entire campaign.
+
+In addition, the impact of campaign-specific information (date of campaign, outcome of previous contacts) in the model can be extracted to a report to help sales manager plan the next event better.
+
+

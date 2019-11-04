@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Predicting subscriptions with bank direct marketing data</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Langyi Tian" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="custom_Xaringan.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Predicting subscriptions with bank direct marketing data
+### Langyi Tian
+### Nov 2019
+
+---
+
+exclude: true
+
+class: left, top
+background-image: url(images/roadmap.png)
+background-size: 100%
+background-position: 50% 280%
+
+
+
+
+
+
+
+
+```
+##   age       job marital   education default housing loan   contact month
+## 1  56 housemaid married    basic.4y      no      no   no telephone   may
+## 2  57  services married high.school unknown      no   no telephone   may
+## 3  37  services married high.school      no     yes   no telephone   may
+## 4  40    admin. married    basic.6y      no      no   no telephone   may
+## 5  56  services married high.school      no      no  yes telephone   may
+##   day_of_week duration campaign pdays previous    poutcome emp.var.rate
+## 1         mon      261        1   999        0 nonexistent          1.1
+## 2         mon      149        1   999        0 nonexistent          1.1
+## 3         mon      226        1   999        0 nonexistent          1.1
+## 4         mon      151        1   999        0 nonexistent          1.1
+## 5         mon      307        1   999        0 nonexistent          1.1
+##   cons.price.idx cons.conf.idx euribor3m nr.employed  y
+## 1         93.994         -36.4     4.857        5191 no
+## 2         93.994         -36.4     4.857        5191 no
+## 3             NA         -36.4     4.857        5191 no
+## 4         93.994         -36.4     4.857        5191 no
+## 5             NA         -36.4     4.857        5191 no
+```
+
+
+```
+## [1] "summary of variables"
+```
+
+```
+## [1] "age"
+## [1] "var type changed from integer to numeric"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##      17      32      38      40      47      98    3744 
+## [1] "job"
+## 
+##        admin.   blue-collar  entrepreneur     housemaid    management 
+##         10422          9254          1456          1060          2924 
+##       retired self-employed      services       student    technician 
+##          1720          1421          3969           875          6743 
+##    unemployed       unknown 
+##          1014           330 
+## [1] "marital"
+## 
+## divorced  married   single  unknown 
+##     4612    24928    11568       80 
+## [1] "education"
+## 
+##            basic.4y            basic.6y            basic.9y 
+##                4176                2292                6045 
+##         high.school          illiterate professional.course 
+##                9515                  18                5243 
+##   university.degree             unknown 
+##               12168                1731 
+## [1] "default"
+## 
+##      no unknown     yes 
+##   32588    8597       3 
+## [1] "housing"
+## 
+##      no unknown     yes 
+##   18622     990   21576 
+## [1] "loan"
+## 
+##      no unknown     yes 
+##   33950     990    6248 
+## [1] "contact"
+## 
+##  cellular telephone 
+##     26144     15044 
+## [1] "month"
+## 
+##   apr   aug   dec   jul   jun   mar   may   nov   oct   sep 
+##  2632  6178   182  7174  5318   546 13769  4101   718   570 
+## [1] "day_of_week"
+## 
+##  fri  mon  thu  tue  wed 
+## 7827 8514 8623 8090 8134 
+## [1] "duration"
+## [1] "var type changed from integer to numeric"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##     0.0   102.0   180.0   258.3   319.0  4918.0 
+## [1] "campaign"
+## [1] "var type changed from integer to numeric"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   1.000   1.000   2.000   2.568   3.000  56.000 
+## [1] "pdays"
+## [1] "var type changed from integer to numeric"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##     0.0   999.0   999.0   962.5   999.0   999.0 
+## [1] "previous"
+## [1] "var type changed from integer to numeric"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   0.000   0.000   0.000   0.173   0.000   7.000 
+## [1] "poutcome"
+## 
+##     failure nonexistent     success 
+##        4252       35563        1373 
+## [1] "emp.var.rate"
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+## -3.40000 -1.80000  1.10000  0.08189  1.40000  1.40000 
+## [1] "cons.price.idx"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+##   92.20   93.08   93.75   93.58   93.99   94.77    5148 
+## [1] "cons.conf.idx"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   -50.8   -42.7   -41.8   -40.5   -36.4   -26.9 
+## [1] "euribor3m"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   0.634   1.344   4.857   3.621   4.961   5.045 
+## [1] "nr.employed"
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##    4964    5099    5191    5167    5228    5228 
+## [1] "y"
+## 
+##    no   yes 
+## 36548  4640
+```
+
+
+
+---
+##Project summary
+
+ - Mission: Predicting client subscription to a term product
+ 
+ - Data: Direct marketing campaign results
+
+ - Exploratory data analysis:
+ 
+MCA with categorical variables, correlation matrix and PCA with numerics
+
+ - Data preprocessing:
+ 
+Missing value imputation, one hot encoding, scaling, train/test split, under-sampling training set
+
+ - Model training and comparison:
+ 
+Logistic regression, support vector machine, random forest
+
+ - Model selection:
+ 
+Random forest (82% accuracy without hyperparameter tuning)
+ 
+ - Future use cases:
+
+1. Customer portraits supporting target marketing
+2. Predictive information product for campaign operations
+
+---
+##Some months and students linked with more subscription
+ - Totally missing rows and duplicate rows were removed first
+ - A MCA with all categorical variables
+
+
+&lt;img src="slides_bank_marketing_files/figure-html/visualize mca out-1.png" style="display: block; margin: auto;" /&gt;
+ - Overall, 4639 out of 41179 (11%) subscribed
+ - On top right, more calls at March (51%), Sep (44%), Oct (44%), Dec (49%) led to subscription
+ - 31% student subscribed, among the top in job categories
+
+---
+##Correlated macroeconomic indicators
+&lt;img src="slides_bank_marketing_files/figure-html/correlation plot-1.png" style="display: block; margin: auto;" /&gt;
+ - Macroecononmics indicators are highly correlated, PCA can be a solution
+
+---
+##Correlated macroeconomic indicators: PCA as a solution
+&lt;img src="slides_bank_marketing_files/figure-html/pca-1.png" style="display: block; margin: auto;" /&gt;
+
+ - Consumer confidence index relatively independent in PCA
+
+---
+##Need to normalize and drop pdays
+&lt;img src="slides_bank_marketing_files/figure-html/plot var summary-1.png" style="display: block; margin: auto;" /&gt;
+
+ - pdays contains little information, dropped in subsequent analysis
+ 
+ - Other variables right skewed, will be normalized later on
+ 
+
+
+---
+##Transformations and missing value imputation
+ - One hot encoding all categorical variables
+ 
+ - Transform binary variables into dummies
+ 
+ - Impute missing ages and CPI with average values (~5400 values replaced)
+
+##Train/test split and preprocessing
+ - 0.8 train/test random split, training set contains 32,943 obs
+ 
+ - After split, centering and scaling both samples to keep the training set "independent"
+ 
+ - Further under-sampling training set to have a half-half balance between "no" and "yes" in y
+ 
+ - Final training set contains 7,424 obs
+
+
+
+
+
+
+
+---
+##Model 1: Logistic regressions 
+ - Baseline, generalist model
+
+
+
+
+```
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6180  361
+##          1 1129  566
+##                                           
+##                Accuracy : 0.8191          
+##                  95% CI : (0.8106, 0.8273)
+##     No Information Rate : 0.8874          
+##     P-Value [Acc &gt; NIR] : 1               
+##                                           
+##                   Kappa : 0.335           
+##                                           
+##  Mcnemar's Test P-Value : &lt;2e-16          
+##                                           
+##             Sensitivity : 0.8455          
+##             Specificity : 0.6106          
+##          Pos Pred Value : 0.9448          
+##          Neg Pred Value : 0.3339          
+##              Prevalence : 0.8874          
+##          Detection Rate : 0.7504          
+##    Detection Prevalence : 0.7942          
+##       Balanced Accuracy : 0.7281          
+##                                           
+##        'Positive' Class : 0               
+## 
+```
+
+---
+##Model 2: Support vector machine
+ - Less overfitting, moderate dimensionality
+
+
+
+
+```
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6285  389
+##          1 1024  538
+##                                           
+##                Accuracy : 0.8284          
+##                  95% CI : (0.8201, 0.8365)
+##     No Information Rate : 0.8874          
+##     P-Value [Acc &gt; NIR] : 1               
+##                                           
+##                   Kappa : 0.3389          
+##                                           
+##  Mcnemar's Test P-Value : &lt;2e-16          
+##                                           
+##             Sensitivity : 0.8599          
+##             Specificity : 0.5804          
+##          Pos Pred Value : 0.9417          
+##          Neg Pred Value : 0.3444          
+##              Prevalence : 0.8874          
+##          Detection Rate : 0.7631          
+##    Detection Prevalence : 0.8103          
+##       Balanced Accuracy : 0.7201          
+##                                           
+##        'Positive' Class : 0               
+## 
+```
+
+---
+##Model 3: Random forest
+ - Good for data mixed with categories and numerical, less overfitting
+
+
+
+
+```
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6228  361
+##          1 1081  566
+##                                           
+##                Accuracy : 0.8249          
+##                  95% CI : (0.8165, 0.8331)
+##     No Information Rate : 0.8874          
+##     P-Value [Acc &gt; NIR] : 1               
+##                                           
+##                   Kappa : 0.3455          
+##                                           
+##  Mcnemar's Test P-Value : &lt;2e-16          
+##                                           
+##             Sensitivity : 0.8521          
+##             Specificity : 0.6106          
+##          Pos Pred Value : 0.9452          
+##          Neg Pred Value : 0.3437          
+##              Prevalence : 0.8874          
+##          Detection Rate : 0.7562          
+##    Detection Prevalence : 0.8000          
+##       Balanced Accuracy : 0.7313          
+##                                           
+##        'Positive' Class : 0               
+## 
+```
+
+---
+##Model choice: random forest
+ - Comparative accuracy (82%) compared with logit (81%) and SVM (83%) even without tuning, good ROC
+ 
+ - Fewer false negatives: help to minimize huge loss cases where potential subscribers are not identified 
+ 
+ - Good interpretability with the ability to return variable importance and visualize sample trees
+ 
+&lt;img src="slides_bank_marketing_files/figure-html/roc rf-1.png" style="display: block; margin: auto;" /&gt;
+
+ - Next step: hyperparameter tuning and possibly compare with other tree algorithms (such as GBM)
+ 
+---
+##Future use cases
+ - For marketers: customer portraits supporting target marketing effort
+ 
+Knowing who to sell to helps business evolve from mass marketing to target marketing. A report on customer acquisision strategy regarding which kind of customers will have better likelihood to subscribe can be proposed. Customer persona can be generated from some models (such as the coeffecients of the logistics regression, or some sample tree structures of random forest). Delivered to marketers, it would support practices that approach target customer group better. For example, for a TV advertisement, it might be designed and personalized for students since they have a higher likelihood to subscribe among others.
+ 
+ - For sales: predictive information product during campaign event
+ 
+In direct marketing campaigns, call agents are in charge of outbound sales calls, who usually have to scroll through random and endless customer profiles. An end-user product (such as a dashboard or report connecting to the CRM system) providing a metric of "likelihood to subscribe" based on the CRM information would help them to prioritize the contact task (i.e. contact highly likely customers first), make the work more fun for them, and enhance the convertion rate of the entire campaign.
+
+In addition, the impact of campaign-specific information (date of campaign, outcome of previous contacts) in the model can be extracted to a report to help sales manager plan the next event better.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightStyle": "github",
+"highlightLines": true
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
