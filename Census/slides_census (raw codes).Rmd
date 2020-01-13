@@ -1,5 +1,6 @@
 ---
-title: "Predicting subscriptions with bank direct marketing data"
+title: "What identifies high-income people?"
+subtitle: "An analysis of Census data"
 author: "Langyi Tian"
 date: "Jan 2020"
 output:
@@ -32,13 +33,13 @@ knitr::opts_chunk$set(
   eval = TRUE,
   message = FALSE,
   warning = FALSE,
-  fig.height = 5,
-  fig.width = 12,
+  fig.height = 6,
+  fig.width = 16,
   fig.align = "center",
   cache = TRUE,
   cache.lazy = FALSE
 )
-knitr::opts_knit$set(root.dir = "C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning/Census")
+#knitr::opts_knit$set(root.dir = "C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning/Census")
 options(htmltools.dir.version = FALSE)
 ```  
 
@@ -250,10 +251,73 @@ for (i in names(dta)) {
 }
 ```
 
-## EDA: Correspondence analysis
+## EDA
 What attributes are associated with higher income? 
 The variables in this data are mostly categorical. The way to understand the relationship between variables are thus different from the continous variable case. 
 
+##Visualize relationship between variables
+```{r making plots}
+#construct summary statistics by education, profit, martial status etc. to set up ggplot data infrastructure
+education.plot <- ggplot(
+  data = dta %>% group_by(education.group, income) %>% summarise(percent =
+                                                                        n() * 100 / nrow(dta)) %>% mutate(group = str_c(education.group, " and income", income)),
+  aes(x = education.group,
+      y = percent,
+      fill = income)
+)
+
+sex.plot <- ggplot(
+  data = dta %>% group_by(sex, income) %>% summarise(percent =
+                                                                     n() * 100 / nrow(dta)) %>% mutate(group = str_c(sex, " and income", income)),
+  aes(x = sex,
+      y = percent,
+      fill = income)
+)
+
+martial.status.plot <- ggplot(
+  data = dta %>% group_by(martial.status, income) %>% summarise(percent =
+                                                                       n() * 100 / nrow(dta)) %>% mutate(group = str_c(martial.status, " and income", income)),
+  aes(x = martial.status,
+      y = percent,
+      fill = income)
+)
+
+race.plot <- ggplot(
+  data = dta %>% group_by(race, income) %>% summarise(percent =
+                                                             n() * 100 / nrow(dta)) %>% mutate(group = str_c(race, " and income", income)),
+  aes(x = race,
+      y = percent,
+      fill = income)
+)
+
+#my function to make the plots and make them prettier
+formatting <- function(plot, legend = FALSE) {
+  plot <- plot +
+    geom_bar(stat = "identity") +
+    scale_fill_brewer(palette = "Paired") +
+    xlab("") +
+    ylab("") +
+    labs(fill = "Income")  +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  if (legend == FALSE) {
+    plot <- plot +
+      theme(legend.position = "none")
+  }
+  return(plot)
+}
+
+#combine the 4 plots together in 1 page
+grid.arrange(
+  race.plot %>% formatting(),
+  education.plot %>% formatting(),
+  martial.status.plot %>% formatting(),
+  sex.plot %>% formatting(legend = TRUE),
+  left = "Percentage"
+)
+```
+
+##MCA
 Unlike dataset where we can produce a correlation matrix, it's not easy to understand the relationship between categorical and numeric features in mixed data. Since the majority of features in this data are categorical, we create from the few numeric features categorical variables and visualize the relationship between them with MCA, a principal component technique on categorical variables. This method might lose some information when we recode numeric features to categorical variable, but is very beneficial for two purposes for us:
 1. Visualizing the relationships of variables in a multi-variate setting.
 2. Extract principal components from mixed data
@@ -301,72 +365,6 @@ dta$profit.group <- dta$profit %>% cut(
 Because occupation variable contains many categories and there's not a very efficient way to recode them, we didn't include it in the analysis. All other variables are included. 
 
 
-##Visualize relationship between variables
-```{r making plots}
-#construct summary statistics by education, profit, martial status etc. to set up ggplot data infrastructure
-education.plot <- ggplot(
-  data = dta %>% group_by(education.group, income) %>% summarise(percent =
-                                                                        n() * 100 / nrow(dta)) %>% mutate(group = str_c(education.group, " and income", income)),
-  aes(x = education.group,
-      y = percent,
-      fill = income)
-)
-
-profit.plot <- ggplot(
-  data = dta %>% group_by(profit.group, income) %>% summarise(percent =
-                                                                     n() * 100 / nrow(dta)) %>% mutate(group = str_c(profit.group, " and income", income)),
-  aes(x = profit.group,
-      y = percent,
-      fill = income)
-)
-
-martial.status.plot <- ggplot(
-  data = dta %>% group_by(martial.status, income) %>% summarise(percent =
-                                                                       n() * 100 / nrow(dta)) %>% mutate(group = str_c(martial.status, " and income", income)),
-  aes(x = martial.status,
-      y = percent,
-      fill = income)
-)
-
-race.plot <- ggplot(
-  data = dta %>% group_by(race, income) %>% summarise(percent =
-                                                             n() * 100 / nrow(dta)) %>% mutate(group = str_c(race, " and income", income)),
-  aes(x = race,
-      y = percent,
-      fill = income)
-)
-
-#my function to make the plots and make them prettier
-formatting <- function(plot, legend = FALSE) {
-  plot <- plot +
-    geom_bar(stat = "identity") +
-    scale_fill_brewer(palette = "Paired") +
-    xlab("") +
-    ylab("") +
-    labs(fill = "Income")  +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 30, hjust = 1))
-  if (legend == FALSE) {
-    plot <- plot +
-      theme(legend.position = "none")
-  }
-  return(plot)
-}
-
-#combine the 4 plots together in 1 page
-var.plot <- grid.arrange(
-  race.plot %>% formatting(),
-  education.plot %>% formatting(),
-  martial.status.plot %>% formatting(),
-  profit.plot %>% formatting(legend = TRUE),
-  top = "Who tend to have high income? Some examples.",
-  left = "Percentage"
-)
-
-var.plot
-```
-
-
 Here, the MCA is used to visualize categorical groups that have higher likelihood to overlap with higher income groups
 ```{r construct and visualize MCA}
 #select the necessary features into MCA.
@@ -382,8 +380,8 @@ dta_famd <-
                       age.group,
                       hours.group,
                       profit.group,
-                      workingclass
-                    )
+                      occupation,
+                    )%>%mutate(occupation=occupation%>%str_c(" "))
 #Construct the MCA
 res.famd <- FAMD (dta_famd,
                   ncp = 2,#This MCA is not for clustering purpose, so we just use 2 components and visualize them on a plot
@@ -400,11 +398,9 @@ mca.plot<-fviz_famd_var(
  theme_void()+
   xlab("") +
   ylab("") +
-  labs(title = "A more comprehensive view",
-       subtitle = "Groups on the left tend to have lower income, and groups on the right tend to have higher income",
-       caption = "From Multiple Correspondence Analysis (MCA) result")+
-  theme(
-  panel.background = element_rect(fill = "lightyellow1"))
+  labs(title = " ",
+       subtitle = "Groups on the left tend to have higher income (on x-axis)",
+       caption = "From Multiple Correspondence Analysis (MCA) result")
 
 mca.plot
 ```
@@ -437,7 +433,7 @@ train <- dta_modeling %>% filter(set == "train") %>% select(-set)
 test <- dta_modeling %>% filter(set == "test") %>% select(-set)
 ```
 
-For the feature preprocessing, because the objective of the task is not going for the highes accuracy but have some interpretability, I didn't one-hot-encode, scale or normalize the features. These steps are useful for better accuracy but make it hard to interpret the coefficients. 
+For the feature preprocessing, because the objective of the task is not going for the highes accuracy but have some interpretability, I didn't one-hot-encode, over/undersampling, scale or normalize the features. These steps are useful for better accuracy but make it hard to interpret the coefficients. 
 ```{r set up formula and preprocessing with tidymodels}
 #build formula
 formula.1<-formula(income ~ .)
@@ -468,7 +464,48 @@ logistic_glm <-
   fit(formula.1, data = train_baked)
 ```
 
+```{r inspect errors}
+#make predictions on test set
+predictions_glm <- logistic_glm %>%
+  predict(new_data = test_baked) %>%
+  bind_cols(test_baked %>% select(income))
+
+#inspect accuracy
+accuracy <- predictions_glm %>%
+  metrics(income, .pred_class) %>%
+  select(-.estimator) %>%
+  filter(.metric == "accuracy")
+
+#plot accuracy
+prediction.plot<-predictions_glm %>%
+  conf_mat(income, .pred_class) %>%
+  pluck(1) %>%
+  as_tibble() %>%
+  ggplot(aes(Prediction, Truth, alpha = n)) +
+  geom_tile(fill="cyan4",
+            show.legend = FALSE) +
+  geom_text(aes(label = n),
+            colour = "black",
+            alpha = 1,
+            size = 8) +
+  labs(
+    title = str_c(
+      "Overall prediction accuracy: ",
+      100 * accuracy$.estimate %>% round(4),
+      "%"
+    ),
+    subtitle = "Predicting high income group is more challenging",
+    caption = "Result from logistic regression model"
+  ) +
+  theme_classic()
+prediction.plot
+```
+
+
+We output the coefficients from regression and visualize their magnitude
+
 ```{r inspect the coefficients}
+#summary coefficients
 summary_logit<-logistic_glm$fit%>%summary()
 coefficients_table<-summary_logit$coefficients%>%as.data.frame()
 coefficients_table<-bind_cols(var=rownames(coefficients_table),
@@ -477,29 +514,40 @@ coefficients_table<-bind_cols(var=rownames(coefficients_table),
                           )%>%as.data.frame()%>%mutate(coef=coef%>%round(2))
 coefficients_table<-coefficients_table[order(coefficients_table$coef,decreasing = TRUE),]
 
+#plot first 15 coefficients with p<0.01 significance
 coef.plot <- ggplot(
-  data = coefficients_table%>%head(15)%>%filter(var!="occupationmissing"),
-  aes(x = var%>% reorder(coef),
+  data = coefficients_table %>% head(15) %>% filter(var != "occupationmissing",
+                                                    p<0.01),
+  aes(x = var %>% reorder(coef),
       y = coef)
 ) +
-    geom_bar(stat = "identity",
-             fill = "darkseagreen3") +
-    xlab("") +
-    ylab("") +
-    labs(fill = "Income")  +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  geom_bar(stat = "identity",
+           fill = "darkseagreen3") +
+  xlab("") +
+  ylab("") +
+  labs(title = "Some factors strongly increase individual's likelihood to have high income",
+       fill = "Income",
+       caption = "Coefficients with p<0.01 from logsitic regression model")  +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 
 coef.plot
 ```
 
-##With medoisd prediction
-Here, we use K-medoid algorithm instead of traditional K-means, because 
-1. The input data is mixed type containing categorical, ordinal and numeric data. 
-2. 
-It's more computationally expensive compared with K-means, so I only sample 10% of the data in this assignment. 
+##With k-medoid prediction
+Here, we use K-medoid algorithm instead of traditional K-means, because we'd like to extract a sample profile from consumer clusters.
+The centers of cluster in K-medoid is actual data points, thus the output is more "real" and can serve better as examples. 
+K-medoid is more computationally expensive, so I only sample 10% of the data in this assignment. 
+
+Before inputting, I use principal component method to reduce dimensionality
 ```{r principal component analysis with mixed data on sampled test set}
 set.seed(1)
+#select and sample the test set 
 dta_famd_1 <-
   dta %>%filter(set=="test") %>%select(
     income,
@@ -515,6 +563,7 @@ dta_famd_1 <-
     workingclass,
     occupation
   )%>%sample_frac(0.1)
+#do the analysis
 res.famd_1 <- FAMD (dta_famd_1,
                     ncp = 5,
                     sup.var = 1,
@@ -522,6 +571,10 @@ res.famd_1 <- FAMD (dta_famd_1,
                     graph = FALSE)
 km_input<-res.famd_1$ind$coord%>%as.data.frame()
 ```
+
+To select the best k, I didn't follow the typical method to observe reduced variance.
+Alternatively, my goal is to ensure the cluster is stable enough to be a consumer segment, and on this basis, have more segments as possible. 
+Therefore, I bootstrap the K-medoid and observe the stability of clusters. 
 
 ```{r My own function that bootstraps K-medoid using PAM algorithm from package fpc}
 cluster_test <- function(num, nboot) {
@@ -546,45 +599,45 @@ cluster_test <- function(num, nboot) {
 }
 ```
 
-```{r, eval=FALSE}
+```{r check stability when k is 3, eval=FALSE}
 class_pamk_3 <- cluster_test(3, 50)
 ```
 
-```{r, eval=FALSE}
+```{r check stability when k is 4, eval=FALSE}
 class_pamk_4<-cluster_test(4,50)
 ```
 
-```{r, eval=FALSE}
+```{r check stability when k is 5, eval=FALSE}
 class_pamk_5<-cluster_test(5,50)
 ```
 
-```{r, eval=FALSE}
+```{r check stability when k is 6, eval=FALSE}
 class_pamk_6<-cluster_test(6,50)
 ```
 
-```{r, eval=FALSE}
+
+As a result,k=7 is the optimal solution with stable clusters and maximized K. This formulation might not give maximally rediced variance but can serve as interesting insights to consumer segments.
+
+```{r check stability when k is 7, eval=FALSE}
 class_pamk_7<-cluster_test(7,50)
 pamk_mod <- class_pamk_7
 save(pamk_mod,file="pamk_mod.RData")
 ```
 
-```{r, eval=FALSE}
+```{r check stability when k is 8, eval=FALSE}
 class_pamk_8<-cluster_test(8,50)
 ```
 
-```{r, eval=FALSE}
+```{r check stability when k is 9, eval=FALSE}
 class_pamk_9<-cluster_test(9,50)
 ```
 
-```{r}
+```{r produce the profiles of clusters}
 load("pamk_mod.RData")
 cluster_size <- pamk_mod$pamobject$clusinfo[, 1]
 medoid <- cbind(id = seq(1, nrow(dta_famd_1), 1),
                 dta_famd_1) %>% filter(id %in% pamk_mod$pamobject$id.med) %>%
-  cbind(size = (cluster_size / nrow(dta_famd_1)))
-```
- 
-```{r}
+  cbind(size = (cluster_size / nrow(dta_famd_1))) 
 predictions_medoid_glm <- cbind(logistic_glm %>%
                                   predict(new_data = medoid, type = "prob"),
                                 medoid %>% select(-id))
@@ -592,42 +645,134 @@ predictions_medoid_glm<-predictions_medoid_glm[order(predictions_medoid_glm$`.pr
 predictions_medoid_glm%>%data.table::data.table()
 ```
 
-```{r inspect errors}
-predictions_glm <- logistic_glm %>%
-  predict(new_data = test_baked) %>%
-  bind_cols(test_baked %>% select(income))
-
-accuracy <- predictions_glm %>%
-  metrics(income, .pred_class) %>%
-  select(-.estimator) %>%
-  filter(.metric == "accuracy")
-
-prediction.plot<-predictions_glm %>%
-  conf_mat(income, .pred_class) %>%
-  pluck(1) %>%
-  as_tibble() %>%
-  ggplot(aes(Prediction, Truth, alpha = n)) +
-  geom_tile(fill="cyan4",
-            show.legend = FALSE) +
-  geom_text(aes(label = n),
-            colour = "black",
-            alpha = 1,
-            size = 8) +
-  labs(
-    title = str_c(
-      "Overall prediction accuracy: ",
-      100 * accuracy$.estimate %>% round(4),
-      "%"
-    ),
-    subtitle = "Easier to predict lower income groups",
-    caption = "Result from logistic regression model"
-  ) +
-  theme_classic()
-prediction.plot
-```
-
 
 ---
-```{r}
+###Executive Summary
 
+We want to target our marketing/service to higher income people. 
+
+Taking the data, what do we know about them? what can we do to identify them? 
+
+--------------
+Summary of findings:
+
+ - Exploratory analysis at group level
+ 
+Characteristics such as white skin, highly educated, prestigous occupation (manager, professional, etc.) and being married are identified to be linked with higher income group. 
+
+ - Individual-level modeling 
+ 
+Male and nation of origin also emerge as foundamental determinants contributing to higher income
+
+ - Identify them in the future 
+ 
+To address future need to identify high-income people, we tested a machine learning algorithm and find it more challenging to predict the higher-income than the lower-income. 
+
+ - Know more about the targeted segment 
+ 
+To understand specific consumer tribes, we mined 7 tribes with differnt likelihood to have high income.
+
+---
+### Exploratory analysis: specific groups to target
+```{r}
+grid.arrange(
+  sex.plot %>% formatting() +
+    theme(text = element_text(size = 20)),
+  education.plot %>% formatting() +
+    theme(text = element_text(size = 20)),
+  martial.status.plot %>% formatting() +
+    theme(text = element_text(size = 20)),
+  race.plot %>% formatting(legend = TRUE) +
+    theme(text = element_text(size = 20)),
+  left = "Percentage"
+)
+```
+
+ - There are more high-income people among male, the educated, married families, and white people. 
+ - At a rough level, targeting at these groups will be more effecitve than reaching everyone
+ - However, only observing by one dimension is too rough. e.g., how to compare the advantage of white people and college graduates?
+ - The next page gives an overview from multiple dimensions. 
+
+---
+### Exploratory analysis: a more comprehensive overview
+```{r}
+mca.plot+
+  theme(text = element_text(size = 20))+
+  theme(
+  panel.background = element_rect(fill = "lightyellow1"))
+```
+ - A number of groups consist of married families, college graduates, senior people (40-55 yrs old), and people with good occupations (managers, professionals). People there are likely to have high income--much more likely than male or white people as a whole.
+ - But some people are both male and managers. Is it being male or being a manager (or both) that makes his money? How do these two factors compare?
+ - If we'd like to understand these, we need an individual-level analysis that controls these attributes.
+ 
+---
+### Individual-level modeling: identify influential factors
+
+```{r}
+coef.plot+
+  theme(text = element_text(size = 20))
+```
+
+ - Consistent with findings at the group level, being in marriage, having a good occupation and education will create more chance to have high income
+ - Being a male and originating from Asia or Europe actually help a lot more than what seems at group level. Probably, these origin help people get better education, occupation, etc. 
+
+---
+### Identify them in the future: machine learning prediction
+ - What if we want to identify high income people from our future data without knowing their income? 
+ - Machine learning will help us to predict. This is how well we can do at a preliminary stage.
+
+```{r}
+prediction.plot+
+  theme(text = element_text(size = 20))
+```
+
+ - Looks like it's more challenging to find people with higher income than lower income, but surely they are of higher consumer value. Keep improving! 
+
+
+ 
+---
+### Know more about them 
+ - Now we know by what attributes/group membership can we find high income people, and how well we can find them.
+
+ - Finally, what if we want to design a detailed marketing message to some specific consumer segments/tribes? 
+ 
+ - Let' say, we'd like to not only find those with higher income but also know other group-level characteristics such as demographics and occupation, so that we can tailor our strategy? 
+ 
+So, we mined 7 segments in the population that help us understand who we can target and what are they like.
+
+---
+### Know more about them: 7 consumer segments
+
+```{r, fig.height = 8}
+predictions_medoid_glm %>% mutate(
+  `% Probabiliy of >50k income` = `.pred_Income > 50K` %>% round(2) * 100,
+  `Segment % in sample` = size %>% round(2) * 100
+) %>% select(
+  `Sex` =
+    sex,
+  `Age` =
+    age,
+  `Marriage` =
+    martial.status,
+  `Race` =
+    race,
+  `Education level` =
+    education.num,
+  `Job` =
+    occupation,
+  `% Probabiliy of >50k income`,
+  `Segment % in sample`
+) %>% DT::datatable(rownames=FALSE,
+                    
+                    caption = "Consumer segment profiles: Cluster medoids with predicted probability of high income")
+```
+
+---
+###Going forward: applications
+ - Identification of high-income individual with machine learning
+ - Design targeted marketing messages to specific segments
+ - ...
+ 
+ 
+ THANK YOU!
 

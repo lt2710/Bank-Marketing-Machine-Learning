@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>What identifies high-income people?</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Langyi Tian" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <script src="libs/htmlwidgets/htmlwidgets.js"></script>
+    <script src="libs/jquery/jquery.min.js"></script>
+    <link href="libs/datatables-css/datatables-crosstalk.css" rel="stylesheet" />
+    <script src="libs/datatables-binding/datatables.js"></script>
+    <link href="libs/dt-core/css/jquery.dataTables.min.css" rel="stylesheet" />
+    <link href="libs/dt-core/css/jquery.dataTables.extra.css" rel="stylesheet" />
+    <script src="libs/dt-core/js/jquery.dataTables.min.js"></script>
+    <link href="libs/crosstalk/css/crosstalk.css" rel="stylesheet" />
+    <script src="libs/crosstalk/js/crosstalk.min.js"></script>
+    <link rel="stylesheet" href="custom_Xaringan.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# What identifies high-income people?
+## An analysis of Census data
+### Langyi Tian
+### Jan 2020
+
+---
+
+exclude: true
+
+class: left, top
+background-image: url(images/roadmap.png)
+background-size: 100%
+background-position: 50% 280%
+
+
+## Setup
+
+
+
+
+
+
+## Data preparation and EDA
+Before any modeling, the first step is to get an overview of the information and organization of variables in the dataset, based on which we perform basic data cleaning.
+We combine the training and test set during this stage and mark the train/test category in case we need to split them later on. 
+
+
+```
+## 'data.frame':	48842 obs. of  16 variables:
+##  $ set           : Factor w/ 2 levels "train","test": 1 1 1 1 1 1 1 1 1 1 ...
+##  $ age           : int  39 50 38 53 28 37 49 52 31 42 ...
+##  $ workingclass  : chr  " State-gov" " Self-emp-not-inc" " Private" " Private" ...
+##  $ fnlwgt        : int  77516 83311 215646 234721 338409 284582 160187 209642 45781 159449 ...
+##  $ education     : chr  " Bachelors" " Bachelors" " HS-grad" " 11th" ...
+##  $ education.num : int  13 13 9 7 13 14 5 9 14 13 ...
+##  $ martial.status: chr  " Never-married" " Married-civ-spouse" " Divorced" " Married-civ-spouse" ...
+##  $ occupation    : chr  " Adm-clerical" " Exec-managerial" " Handlers-cleaners" " Handlers-cleaners" ...
+##  $ relationship  : chr  " Not-in-family" " Husband" " Not-in-family" " Husband" ...
+##  $ race          : chr  " White" " White" " White" " Black" ...
+##  $ sex           : chr  " Male" " Male" " Male" " Male" ...
+##  $ capital.gain  : int  2174 0 0 0 0 0 0 0 14084 5178 ...
+##  $ capital.loss  : int  0 0 0 0 0 0 0 0 0 0 ...
+##  $ hours.per.week: int  40 13 40 40 40 40 16 45 50 40 ...
+##  $ native.country: chr  " United-States" " United-States" " United-States" " United-States" ...
+##  $ income        : chr  " &lt;=50K" " &lt;=50K" " &lt;=50K" " &lt;=50K" ...
+```
+
+From the structure of data, the majority of the features are categorical.
+We also notice a redundant white space before strings. We'll take care of that.
+From the documentation, the missing values are coded as '?'. We transform it to the standard 'NA' notation in R.
+After the basic manipulations, we print a summary to understand statistical distribution of variables.
+
+
+```
+## 
+## 
+## |                                        |dta (N = 48,842)           |
+## |:---------------------------------------|:--------------------------|
+## |**set**                                 |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; train                      |32,561 (67)                |
+## |&amp;nbsp;&amp;nbsp; test                       |16,281 (33)                |
+## |**age**                                 |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; minimum                    |17                         |
+## |&amp;nbsp;&amp;nbsp; median (IQR)               |37.00 (28.00, 48.00)       |
+## |&amp;nbsp;&amp;nbsp; mean (sd)                  |38.64 &amp;plusmn; 13.71       |
+## |&amp;nbsp;&amp;nbsp; maximum                    |90                         |
+## |**workingclass**                        |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Federal-gov                |1,432 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Local-gov                  |3,136 (7)                  |
+## |&amp;nbsp;&amp;nbsp; Never-worked               |10 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Private                    |33,906 (74)                |
+## |&amp;nbsp;&amp;nbsp; Self-emp-inc               |1,695 (4)                  |
+## |&amp;nbsp;&amp;nbsp; Self-emp-not-inc           |3,862 (8)                  |
+## |&amp;nbsp;&amp;nbsp; State-gov                  |1,981 (4)                  |
+## |&amp;nbsp;&amp;nbsp; Without-pay                |21 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Unknown                    |2,799/48,842 (6)           |
+## |**education**                           |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; 10th                       |1,389 (3)                  |
+## |&amp;nbsp;&amp;nbsp; 11th                       |1,812 (4)                  |
+## |&amp;nbsp;&amp;nbsp; 12th                       |657 (1)                    |
+## |&amp;nbsp;&amp;nbsp; 1st-4th                    |247 (1)                    |
+## |&amp;nbsp;&amp;nbsp; 5th-6th                    |509 (1)                    |
+## |&amp;nbsp;&amp;nbsp; 7th-8th                    |955 (2)                    |
+## |&amp;nbsp;&amp;nbsp; 9th                        |756 (2)                    |
+## |&amp;nbsp;&amp;nbsp; Assoc-acdm                 |1,601 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Assoc-voc                  |2,061 (4)                  |
+## |&amp;nbsp;&amp;nbsp; Bachelors                  |8,025 (16)                 |
+## |&amp;nbsp;&amp;nbsp; Doctorate                  |594 (1)                    |
+## |&amp;nbsp;&amp;nbsp; HS-grad                    |15,784 (32)                |
+## |&amp;nbsp;&amp;nbsp; Masters                    |2,657 (5)                  |
+## |&amp;nbsp;&amp;nbsp; Preschool                  |83 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Prof-school                |834 (2)                    |
+## |&amp;nbsp;&amp;nbsp; Some-college               |10,878 (22)                |
+## |**education.num**                       |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; minimum                    |1                          |
+## |&amp;nbsp;&amp;nbsp; median (IQR)               |10.00 (9.00, 12.00)        |
+## |&amp;nbsp;&amp;nbsp; mean (sd)                  |10.08 &amp;plusmn; 2.57        |
+## |&amp;nbsp;&amp;nbsp; maximum                    |16                         |
+## |**martial.status**                      |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Divorced                   |6,633 (14)                 |
+## |&amp;nbsp;&amp;nbsp; Married-AF-spouse          |37 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Married-civ-spouse         |22,379 (46)                |
+## |&amp;nbsp;&amp;nbsp; Married-spouse-absent      |628 (1)                    |
+## |&amp;nbsp;&amp;nbsp; Never-married              |16,117 (33)                |
+## |&amp;nbsp;&amp;nbsp; Separated                  |1,530 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Widowed                    |1,518 (3)                  |
+## |**occupation**                          |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Adm-clerical               |5,611 (12)                 |
+## |&amp;nbsp;&amp;nbsp; Armed-Forces               |15 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Craft-repair               |6,112 (13)                 |
+## |&amp;nbsp;&amp;nbsp; Exec-managerial            |6,086 (13)                 |
+## |&amp;nbsp;&amp;nbsp; Farming-fishing            |1,490 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Handlers-cleaners          |2,072 (5)                  |
+## |&amp;nbsp;&amp;nbsp; Machine-op-inspct          |3,022 (7)                  |
+## |&amp;nbsp;&amp;nbsp; Other-service              |4,923 (11)                 |
+## |&amp;nbsp;&amp;nbsp; Priv-house-serv            |242 (1)                    |
+## |&amp;nbsp;&amp;nbsp; Prof-specialty             |6,172 (13)                 |
+## |&amp;nbsp;&amp;nbsp; Protective-serv            |983 (2)                    |
+## |&amp;nbsp;&amp;nbsp; Sales                      |5,504 (12)                 |
+## |&amp;nbsp;&amp;nbsp; Tech-support               |1,446 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Transport-moving           |2,355 (5)                  |
+## |&amp;nbsp;&amp;nbsp; Unknown                    |2,809/48,842 (6)           |
+## |**relationship**                        |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Husband                    |19,716 (40)                |
+## |&amp;nbsp;&amp;nbsp; Not-in-family              |12,583 (26)                |
+## |&amp;nbsp;&amp;nbsp; Other-relative             |1,506 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Own-child                  |7,581 (16)                 |
+## |&amp;nbsp;&amp;nbsp; Unmarried                  |5,125 (10)                 |
+## |&amp;nbsp;&amp;nbsp; Wife                       |2,331 (5)                  |
+## |**race**                                |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Amer-Indian-Eskimo         |470 (1)                    |
+## |&amp;nbsp;&amp;nbsp; Asian-Pac-Islander         |1,519 (3)                  |
+## |&amp;nbsp;&amp;nbsp; Black                      |4,685 (10)                 |
+## |&amp;nbsp;&amp;nbsp; Other                      |406 (1)                    |
+## |&amp;nbsp;&amp;nbsp; White                      |41,762 (86)                |
+## |**sex**                                 |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Female                     |16,192 (33)                |
+## |&amp;nbsp;&amp;nbsp; Male                       |32,650 (67)                |
+## |**capital.gain**                        |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; minimum                    |0                          |
+## |&amp;nbsp;&amp;nbsp; median (IQR)               |0.00 (0.00, 0.00)          |
+## |&amp;nbsp;&amp;nbsp; mean (sd)                  |1,079.07 &amp;plusmn; 7,452.02 |
+## |&amp;nbsp;&amp;nbsp; maximum                    |99,999                     |
+## |**capital.loss**                        |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; minimum                    |0                          |
+## |&amp;nbsp;&amp;nbsp; median (IQR)               |0.00 (0.00, 0.00)          |
+## |&amp;nbsp;&amp;nbsp; mean (sd)                  |87.50 &amp;plusmn; 403.00      |
+## |&amp;nbsp;&amp;nbsp; maximum                    |4,356                      |
+## |**hours.per.week**                      |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; minimum                    |1                          |
+## |&amp;nbsp;&amp;nbsp; median (IQR)               |40.00 (40.00, 45.00)       |
+## |&amp;nbsp;&amp;nbsp; mean (sd)                  |40.42 &amp;plusmn; 12.39       |
+## |&amp;nbsp;&amp;nbsp; maximum                    |99                         |
+## |**native.country**                      |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; Cambodia                   |28 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Canada                     |182 (0)                    |
+## |&amp;nbsp;&amp;nbsp; China                      |122 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Columbia                   |85 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Cuba                       |138 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Dominican-Republic         |103 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Ecuador                    |45 (0)                     |
+## |&amp;nbsp;&amp;nbsp; El-Salvador                |155 (0)                    |
+## |&amp;nbsp;&amp;nbsp; England                    |127 (0)                    |
+## |&amp;nbsp;&amp;nbsp; France                     |38 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Germany                    |206 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Greece                     |49 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Guatemala                  |88 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Haiti                      |75 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Holand-Netherlands         |1 (0)                      |
+## |&amp;nbsp;&amp;nbsp; Honduras                   |20 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Hong                       |30 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Hungary                    |19 (0)                     |
+## |&amp;nbsp;&amp;nbsp; India                      |151 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Iran                       |59 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Ireland                    |37 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Italy                      |105 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Jamaica                    |106 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Japan                      |92 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Laos                       |23 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Mexico                     |951 (2)                    |
+## |&amp;nbsp;&amp;nbsp; Nicaragua                  |49 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Outlying-US(Guam-USVI-etc) |23 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Peru                       |46 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Philippines                |295 (1)                    |
+## |&amp;nbsp;&amp;nbsp; Poland                     |87 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Portugal                   |67 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Puerto-Rico                |184 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Scotland                   |21 (0)                     |
+## |&amp;nbsp;&amp;nbsp; South                      |115 (0)                    |
+## |&amp;nbsp;&amp;nbsp; Taiwan                     |65 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Thailand                   |30 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Trinadad&amp;Tobago            |27 (0)                     |
+## |&amp;nbsp;&amp;nbsp; United-States              |43,832 (91)                |
+## |&amp;nbsp;&amp;nbsp; Vietnam                    |86 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Yugoslavia                 |23 (0)                     |
+## |&amp;nbsp;&amp;nbsp; Unknown                    |857/48,842 (2)             |
+## |**income**                              |&amp;nbsp;&amp;nbsp;               |
+## |&amp;nbsp;&amp;nbsp; &lt;=50K                      |24,720 (51)                |
+## |&amp;nbsp;&amp;nbsp; &lt;=50K.                     |12,435 (25)                |
+## |&amp;nbsp;&amp;nbsp; &gt;50K                       |7,841 (16)                 |
+## |&amp;nbsp;&amp;nbsp; &gt;50K.                      |3,846 (8)                  |
+```
+
+### Recoding and transforming features
+The purpose of the analysis is not pure prediction, but to find the relationship between variables and extract insights for the general audience. 
+Therefore, the variables need to be engineered so that the categories should be simple enough to be understood by a normal human reader. 
+
+Several variables (e.g. nation of origin) contain very specific categories with extremely small portions. Such level of details cannot be comprehended by general audience and potentially can cause overfitting. Therefore, some categories are binned to avoid these cases.
+
+Country names have too many values and need to be binned.
+I recode countries other than the US, Mexico and Phillipines to the corresponding continent. The chi-square wasn't lowered much. 
+
+
+The capital gain/loss might be combined into capital profit 
+
+
+The income is coded incorrectly. 
+
+
+Of course, we try to minimize the variance loss during binning. Therefore, we produce contigency tables with chi-square to decide which categories to merge together. 
+
+```
+## [1] "workingclass"
+## [1] 0.1640409
+##                   
+##                    Income &lt;= 50K Income &gt; 50K
+##   Federal-gov                871          561
+##   Local-gov                 2209          927
+##   Never-worked                10            0
+##   Private                  26519         7387
+##   Self-emp-inc               757          938
+##   Self-emp-not-inc          2785         1077
+##   State-gov                 1451          530
+##   Without-pay                 19            2
+## [1] "education"
+## [1] 0.3658683
+##               
+##                Income &lt;= 50K Income &gt; 50K
+##   10th                  1302           87
+##   11th                  1720           92
+##   12th                   609           48
+##   1st-4th                239            8
+##   5th-6th                482           27
+##   7th-8th                893           62
+##   9th                    715           41
+##   Assoc-acdm            1188          413
+##   Assoc-voc             1539          522
+##   Bachelors             4712         3313
+##   Doctorate              163          431
+##   HS-grad              13281         2503
+##   Masters               1198         1459
+##   Preschool               82            1
+##   Prof-school            217          617
+##   Some-college          8815         2063
+## [1] "martial.status"
+## [1] 0.4483022
+##                        
+##                         Income &lt;= 50K Income &gt; 50K
+##   Divorced                       5962          671
+##   Married-AF-spouse                23           14
+##   Married-civ-spouse            12395         9984
+##   Married-spouse-absent           570           58
+##   Never-married                 15384          733
+##   Separated                      1431           99
+##   Widowed                        1390          128
+## [1] "occupation"
+## [1] 0.3457255
+##                    
+##                     Income &lt;= 50K Income &gt; 50K
+##   Adm-clerical               4843          768
+##   Armed-Forces                 10            5
+##   Craft-repair               4729         1383
+##   Exec-managerial            3178         2908
+##   Farming-fishing            1317          173
+##   Handlers-cleaners          1934          138
+##   Machine-op-inspct          2650          372
+##   Other-service              4719          204
+##   Priv-house-serv             239            3
+##   Prof-specialty             3388         2784
+##   Protective-serv             675          308
+##   Sales                      4029         1475
+##   Tech-support               1026          420
+##   Transport-moving           1874          481
+## [1] "relationship"
+## [1] 0.4544869
+##                 
+##                  Income &lt;= 50K Income &gt; 50K
+##   Husband                10870         8846
+##   Not-in-family          11307         1276
+##   Other-relative          1454           52
+##   Own-child               7470          111
+##   Unmarried               4816          309
+##   Wife                    1238         1093
+## [1] "race"
+## [1] 0.09985722
+##                     
+##                      Income &lt;= 50K Income &gt; 50K
+##   Amer-Indian-Eskimo           415           55
+##   Asian-Pac-Islander          1110          409
+##   Black                       4119          566
+##   Other                        356           50
+##   White                      31155        10607
+## [1] "sex"
+## [1] 0.214628
+##         
+##          Income &lt;= 50K Income &gt; 50K
+##   Female         14423         1769
+##   Male           22732         9918
+## [1] "native.country"
+## [1] 0.07252299
+##                
+##                 Income &lt;= 50K Income &gt; 50K
+##   Americas               1945          224
+##   Asia                    665          286
+##   Europe                  437          172
+##   Not matched             948          310
+##   Oceania                  22            1
+##   United-States         33138        10694
+```
+
+
+
+
+### Missing value imputation
+Next, we'd deal with the missing values in the data.
+
+```
+## Continuous
+##                         label var_type     n missing_n missing_percent  mean
+## age                       age    &lt;int&gt; 48842         0             0.0  38.6
+## education.num   education.num    &lt;int&gt; 48842         0             0.0  10.1
+## hours.per.week hours.per.week    &lt;int&gt; 48842         0             0.0  40.4
+## profit                 profit    &lt;int&gt; 48842         0             0.0 991.6
+##                    sd     min quartile_25 median quartile_75     max
+## age              13.7    17.0        28.0   37.0        48.0    90.0
+## education.num     2.6     1.0         9.0   10.0        12.0    16.0
+## hours.per.week   12.4     1.0        40.0   40.0        45.0    99.0
+## profit         7475.5 -4356.0         0.0    0.0         0.0 99999.0
+## 
+## Categorical
+##                         label var_type     n missing_n missing_percent levels_n
+## set                       set    &lt;fct&gt; 48842         0             0.0        2
+## workingclass     workingclass    &lt;chr&gt; 46043      2799             5.7        4
+## education           education    &lt;chr&gt; 48842         0             0.0       16
+## martial.status martial.status    &lt;chr&gt; 48842         0             0.0        3
+## occupation         occupation    &lt;chr&gt; 46033      2809             5.8       14
+## relationship     relationship    &lt;chr&gt; 48842         0             0.0        6
+## race                     race    &lt;chr&gt; 48842         0             0.0        3
+## sex                       sex    &lt;chr&gt; 48842         0             0.0        2
+## native.country native.country    &lt;chr&gt; 48842         0             0.0        6
+## income                 income    &lt;chr&gt; 48842         0             0.0        2
+##                         levels levels_count levels_percent
+## set            "train", "test" 32561, 16281         67, 33
+## workingclass                 -            -              -
+## education                    -            -              -
+## martial.status               -            -              -
+## occupation                   -            -              -
+## relationship                 -            -              -
+## race                         -            -              -
+## sex                          -            -              -
+## native.country               -            -              -
+## income                       -            -              -
+```
+Two factors contain missing values: occupation and working class. We'd like to see whether the missing can be by random or not, so that we can decide about ways to impute them.
+
+&lt;img src="slides_census_files/figure-html/observe pattern of missingness-1.png" style="display: block; margin: auto;" /&gt;
+
+```
+##       native.country workingclass occupation     
+## 46033              1            1          1    0
+## 10                 1            1          0    1
+## 2799               1            0          0    2
+##                    0         2799       2809 5608
+```
+
+The missingness in workingclass and occupation highly correlates with each other. We should guess whether it's MAR or MNAR
+
+
+```
+##   Missing data analysis: workingclass               Not missing        Missing
+## 1                                 age Mean (SD)     38.6 (13.2)    40.1 (20.2)
+## 2                       education.num Mean (SD)      10.1 (2.6)      9.3 (2.5)
+## 3                              profit Mean (SD) 1025.4 (7612.6) 435.3 (4642.8)
+##        p
+## 1 &lt;0.001
+## 2 &lt;0.001
+## 3  0.070
+```
+
+The missingness in working-related information seems not by random. Those missing the information tend to be older, receive less education, be less active in investment activities. Therefore, statistical imputing would introduce bias and we simply recode the missing value with "missing" label in order not to lose the "non-randomness" in the missing values.
+
+
+
+
+For any modeling, we need to transform character to factor.
+
+
+## EDA
+What attributes are associated with higher income? 
+The variables in this data are mostly categorical. The way to understand the relationship between variables are thus different from the continous variable case. 
+
+##Visualize relationship between variables
+&lt;img src="slides_census_files/figure-html/making plots-1.png" style="display: block; margin: auto;" /&gt;
+
+##MCA
+Unlike dataset where we can produce a correlation matrix, it's not easy to understand the relationship between categorical and numeric features in mixed data. Since the majority of features in this data are categorical, we create from the few numeric features categorical variables and visualize the relationship between them with MCA, a principal component technique on categorical variables. This method might lose some information when we recode numeric features to categorical variable, but is very beneficial for two purposes for us:
+1. Visualizing the relationships of variables in a multi-variate setting.
+2. Extract principal components from mixed data
+
+
+```
+## 
+## 
+## |                               |dta %&gt;% filter(income == "Income &lt;= 50K") (N = 37,155) |dta %&gt;% filter(income == "Income &gt; 50K") (N = 11,687) |
+## |:------------------------------|:------------------------------------------------------|:-----------------------------------------------------|
+## |**set**                        |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; train             |24,720 (67)                                            |7,841 (67)                                            |
+## |&amp;nbsp;&amp;nbsp; test              |12,435 (33)                                            |3,846 (33)                                            |
+## |**age**                        |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; minimum           |17                                                     |19                                                    |
+## |&amp;nbsp;&amp;nbsp; median (IQR)      |34 (25.00, 46.00)                                      |43 (36.00, 51.00)                                     |
+## |&amp;nbsp;&amp;nbsp; mean (sd)         |36.87 &amp;plusmn; 14.10                                   |44.28 &amp;plusmn; 10.56                                  |
+## |&amp;nbsp;&amp;nbsp; maximum           |90                                                     |90                                                    |
+## |**workingclass**               |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Government        |4,531 (12)                                             |2,018 (17)                                            |
+## |&amp;nbsp;&amp;nbsp; missing           |2,534 (7)                                              |265 (2)                                               |
+## |&amp;nbsp;&amp;nbsp; No work/pay       |29 (0)                                                 |2 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; Private           |26,519 (71)                                            |7,387 (63)                                            |
+## |&amp;nbsp;&amp;nbsp; Self-employed     |3,542 (10)                                             |2,015 (17)                                            |
+## |**education**                  |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; 10th              |1,302 (4)                                              |87 (1)                                                |
+## |&amp;nbsp;&amp;nbsp; 11th              |1,720 (5)                                              |92 (1)                                                |
+## |&amp;nbsp;&amp;nbsp; 12th              |609 (2)                                                |48 (0)                                                |
+## |&amp;nbsp;&amp;nbsp; 1st-4th           |239 (1)                                                |8 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; 5th-6th           |482 (1)                                                |27 (0)                                                |
+## |&amp;nbsp;&amp;nbsp; 7th-8th           |893 (2)                                                |62 (1)                                                |
+## |&amp;nbsp;&amp;nbsp; 9th               |715 (2)                                                |41 (0)                                                |
+## |&amp;nbsp;&amp;nbsp; Assoc-acdm        |1,188 (3)                                              |413 (4)                                               |
+## |&amp;nbsp;&amp;nbsp; Assoc-voc         |1,539 (4)                                              |522 (4)                                               |
+## |&amp;nbsp;&amp;nbsp; Bachelors         |4,712 (13)                                             |3,313 (28)                                            |
+## |&amp;nbsp;&amp;nbsp; Doctorate         |163 (0)                                                |431 (4)                                               |
+## |&amp;nbsp;&amp;nbsp; HS-grad           |13,281 (36)                                            |2,503 (21)                                            |
+## |&amp;nbsp;&amp;nbsp; Masters           |1,198 (3)                                              |1,459 (12)                                            |
+## |&amp;nbsp;&amp;nbsp; Preschool         |82 (0)                                                 |1 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; Prof-school       |217 (1)                                                |617 (5)                                               |
+## |&amp;nbsp;&amp;nbsp; Some-college      |8,815 (24)                                             |2,063 (18)                                            |
+## |**education.num**              |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; minimum           |1                                                      |1                                                     |
+## |&amp;nbsp;&amp;nbsp; median (IQR)      |9 (9.00, 10.00)                                        |12 (10.00, 13.00)                                     |
+## |&amp;nbsp;&amp;nbsp; mean (sd)         |9.60 &amp;plusmn; 2.44                                     |11.60 &amp;plusmn; 2.38                                   |
+## |&amp;nbsp;&amp;nbsp; maximum           |16                                                     |16                                                    |
+## |**martial.status**             |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Married           |12,418 (33)                                            |9,998 (86)                                            |
+## |&amp;nbsp;&amp;nbsp; Never-married     |15,384 (41)                                            |733 (6)                                               |
+## |&amp;nbsp;&amp;nbsp; post-marriage     |9,353 (25)                                             |956 (8)                                               |
+## |**occupation**                 |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Adm-clerical      |4,843 (13)                                             |768 (7)                                               |
+## |&amp;nbsp;&amp;nbsp; Armed-Forces      |10 (0)                                                 |5 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; Craft-repair      |4,729 (13)                                             |1,383 (12)                                            |
+## |&amp;nbsp;&amp;nbsp; Exec-managerial   |3,178 (9)                                              |2,908 (25)                                            |
+## |&amp;nbsp;&amp;nbsp; Farming-fishing   |1,317 (4)                                              |173 (1)                                               |
+## |&amp;nbsp;&amp;nbsp; Handlers-cleaners |1,934 (5)                                              |138 (1)                                               |
+## |&amp;nbsp;&amp;nbsp; Machine-op-inspct |2,650 (7)                                              |372 (3)                                               |
+## |&amp;nbsp;&amp;nbsp; missing           |2,544 (7)                                              |265 (2)                                               |
+## |&amp;nbsp;&amp;nbsp; Other-service     |4,719 (13)                                             |204 (2)                                               |
+## |&amp;nbsp;&amp;nbsp; Priv-house-serv   |239 (1)                                                |3 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; Prof-specialty    |3,388 (9)                                              |2,784 (24)                                            |
+## |&amp;nbsp;&amp;nbsp; Protective-serv   |675 (2)                                                |308 (3)                                               |
+## |&amp;nbsp;&amp;nbsp; Sales             |4,029 (11)                                             |1,475 (13)                                            |
+## |&amp;nbsp;&amp;nbsp; Tech-support      |1,026 (3)                                              |420 (4)                                               |
+## |&amp;nbsp;&amp;nbsp; Transport-moving  |1,874 (5)                                              |481 (4)                                               |
+## |**relationship**               |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Husband           |10,870 (29)                                            |8,846 (76)                                            |
+## |&amp;nbsp;&amp;nbsp; Not-in-family     |11,307 (30)                                            |1,276 (11)                                            |
+## |&amp;nbsp;&amp;nbsp; Other-relative    |1,454 (4)                                              |52 (0)                                                |
+## |&amp;nbsp;&amp;nbsp; Own-child         |7,470 (20)                                             |111 (1)                                               |
+## |&amp;nbsp;&amp;nbsp; Unmarried         |4,816 (13)                                             |309 (3)                                               |
+## |&amp;nbsp;&amp;nbsp; Wife              |1,238 (3)                                              |1,093 (9)                                             |
+## |**race**                       |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Black             |4,119 (11)                                             |566 (5)                                               |
+## |&amp;nbsp;&amp;nbsp; Other             |1,881 (5)                                              |514 (4)                                               |
+## |&amp;nbsp;&amp;nbsp; White             |31,155 (84)                                            |10,607 (91)                                           |
+## |**sex**                        |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Female            |14,423 (39)                                            |1,769 (15)                                            |
+## |&amp;nbsp;&amp;nbsp; Male              |22,732 (61)                                            |9,918 (85)                                            |
+## |**hours.per.week**             |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; minimum           |1                                                      |1                                                     |
+## |&amp;nbsp;&amp;nbsp; median (IQR)      |40 (35.00, 40.00)                                      |40 (40.00, 50.00)                                     |
+## |&amp;nbsp;&amp;nbsp; mean (sd)         |38.84 &amp;plusmn; 12.36                                   |45.45 &amp;plusmn; 11.09                                  |
+## |&amp;nbsp;&amp;nbsp; maximum           |99                                                     |99                                                    |
+## |**native.country**             |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Americas          |1,945 (5)                                              |224 (2)                                               |
+## |&amp;nbsp;&amp;nbsp; Asia              |665 (2)                                                |286 (2)                                               |
+## |&amp;nbsp;&amp;nbsp; Europe            |437 (1)                                                |172 (1)                                               |
+## |&amp;nbsp;&amp;nbsp; Not matched       |948 (3)                                                |310 (3)                                               |
+## |&amp;nbsp;&amp;nbsp; Oceania           |22 (0)                                                 |1 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; United-States     |33,138 (89)                                            |10,694 (92)                                           |
+## |**income**                     |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; Income &lt;= 50K     |37,155 (100)                                           |0 (0)                                                 |
+## |&amp;nbsp;&amp;nbsp; Income &gt; 50K      |0 (0)                                                  |11,687 (100)                                          |
+## |**profit**                     |&amp;nbsp;&amp;nbsp;                                           |&amp;nbsp;&amp;nbsp;                                          |
+## |&amp;nbsp;&amp;nbsp; minimum           |-4,356                                                 |-3,683                                                |
+## |&amp;nbsp;&amp;nbsp; median (IQR)      |0 (0.00, 0.00)                                         |0 (0.00, 0.00)                                        |
+## |&amp;nbsp;&amp;nbsp; mean (sd)         |92.86 &amp;plusmn; 995.79                                  |3,848.71 &amp;plusmn; 14,821.57                           |
+## |&amp;nbsp;&amp;nbsp; maximum           |41,310                                                 |99,999                                                |
+```
+
+
+
+Because occupation variable contains many categories and there's not a very efficient way to recode them, we didn't include it in the analysis. All other variables are included. 
+
+
+Here, the MCA is used to visualize categorical groups that have higher likelihood to overlap with higher income groups
+&lt;img src="slides_census_files/figure-html/construct and visualize MCA-1.png" style="display: block; margin: auto;" /&gt;
+
+
+#Modeling
+Not only do we want to understand the relationship between income category and other variables, we'd also want to understand how much is the contribution to higher income from each factor. A regression model allows to observe the impact controlling other factors, therefore it's the most appropriate choice given the objective of "What are the key factors contributing to high vs. low income?"
+
+Because of a lot of categorical variables in the data, overfitting can be easy. Therefore, although the purpose is prediction, we use cross-validation to conduct the analysis.
+
+For this part, I use tidymodels, an R package that is similar to scikit-learn library to build and train the model
+
+
+
+For the feature preprocessing, because the objective of the task is not going for the highes accuracy but have some interpretability, I didn't one-hot-encode, over/undersampling, scale or normalize the features. These steps are useful for better accuracy but make it hard to interpret the coefficients. 
+
+
+Because of the binary nature of outcome variable, we use logistic regression. 
+Since we already engineered the features and want to observe the impact from factors, I didn't penalize the regression.
+
+
+
+&lt;img src="slides_census_files/figure-html/inspect errors-1.png" style="display: block; margin: auto;" /&gt;
+
+
+We output the coefficients from regression and visualize their magnitude
+
+&lt;img src="slides_census_files/figure-html/inspect the coefficients-1.png" style="display: block; margin: auto;" /&gt;
+
+##With k-medoid prediction
+Here, we use K-medoid algorithm instead of traditional K-means, because we'd like to extract a sample profile from consumer clusters.
+The centers of cluster in K-medoid is actual data points, thus the output is more "real" and can serve better as examples. 
+K-medoid is more computationally expensive, so I only sample 10% of the data in this assignment. 
+
+Before inputting, I use principal component method to reduce dimensionality
+
+
+To select the best k, I didn't follow the typical method to observe reduced variance.
+Alternatively, my goal is to ensure the cluster is stable enough to be a consumer segment, and on this basis, have more segments as possible. 
+Therefore, I bootstrap the K-medoid and observe the stability of clusters. 
+
+
+
+
+
+
+
+
+
+
+
+
+As a result,k=7 is the optimal solution with stable clusters and maximized K. This formulation might not give maximally rediced variance but can serve as interesting insights to consumer segments.
+
+
+
+
+
+
+
+
+```
+##    .pred_Income &lt;= 50K .pred_Income &gt; 50K        income    sex education.num
+## 1:           0.4650915        0.534908497  Income &gt; 50K   Male            13
+## 2:           0.6423427        0.357657297  Income &gt; 50K   Male            10
+## 3:           0.7884056        0.211594373 Income &lt;= 50K   Male             9
+## 4:           0.9371016        0.062898367 Income &lt;= 50K   Male            10
+## 5:           0.9693794        0.030620585 Income &lt;= 50K   Male            10
+## 6:           0.9802136        0.019786427 Income &lt;= 50K Female             9
+## 7:           0.9969550        0.003045044 Income &lt;= 50K   Male             9
+##     race martial.status  relationship native.country age hours.per.week profit
+## 1: Other        Married       Husband           Asia  46             40      0
+## 2: White        Married       Husband  United-States  38             50  -1887
+## 3: White        Married       Husband  United-States  36             40      0
+## 4: Black  Never-married Not-in-family  United-States  30             45      0
+## 5: White  Never-married Not-in-family  United-States  48             35      0
+## 6: White  post-marriage Not-in-family  United-States  59             40      0
+## 7: White  Never-married     Own-child  United-States  21             40      0
+##    workingclass       occupation       size
+## 1:      Private     Adm-clerical 0.06449631
+## 2:   Government  Protective-serv 0.19594595
+## 3:      Private Transport-moving 0.17690418
+## 4:   Government  Protective-serv 0.21744472
+## 5:      missing          missing 0.13759214
+## 6:      Private    Other-service 0.02518428
+## 7:      Private    Other-service 0.18243243
+```
+
+
+---
+###Executive Summary
+
+We want to target our marketing/service to higher income people. 
+
+Taking the data, what do we know about them? what can we do to identify them? 
+
+--------------
+Summary of findings:
+
+ - Exploratory analysis at group level
+ 
+Characteristics such as white skin, highly educated, prestigous occupation (manager, professional, etc.) and being married are identified to be linked with higher income group. 
+
+ - Individual-level modeling 
+ 
+Male and nation of origin also emerge as foundamental determinants contributing to higher income
+
+ - Identify them in the future 
+ 
+To address future need to identify high-income people, we tested a machine learning algorithm and find it more challenging to predict the higher-income than the lower-income. 
+
+ - Know more about the targeted segment 
+ 
+To understand specific consumer tribes, we mined 7 tribes with differnt likelihood to have high income.
+
+---
+### Exploratory analysis: specific groups to target
+&lt;img src="slides_census_files/figure-html/unnamed-chunk-1-1.png" style="display: block; margin: auto;" /&gt;
+
+ - There are more high-income people among male, the educated, married families, and white people. 
+ - At a rough level, targeting at these groups will be more effecitve than reaching everyone
+ - However, only observing by one dimension is too rough. e.g., how to compare the advantage of white people and college graduates?
+ - The next page gives an overview from multiple dimensions. 
+
+---
+### Exploratory analysis: a more comprehensive overview
+&lt;img src="slides_census_files/figure-html/unnamed-chunk-2-1.png" style="display: block; margin: auto;" /&gt;
+ - A number of groups consist of married families, college graduates, senior people (40-55 yrs old), and people with good occupations (managers, professionals). People there are likely to have high income--much more likely than male or white people as a whole.
+ - But some people are both male and managers. Is it being male or being a manager (or both) that makes his money? How do these two factors compare?
+ - If we'd like to understand these, we need an individual-level analysis that controls these attributes.
+ 
+---
+### Individual-level modeling: identify influential factors
+
+&lt;img src="slides_census_files/figure-html/unnamed-chunk-3-1.png" style="display: block; margin: auto;" /&gt;
+
+ - Consistent with findings at the group level, being in marriage, having a good occupation and education will create more chance to have high income
+ - Being a male and originating from Asia or Europe actually help a lot more than what seems at group level. Probably, these origin help people get better education, occupation, etc. 
+
+---
+### Identify them in the future: machine learning prediction
+ - What if we want to identify high income people from our future data without knowing their income? 
+ - Machine learning will help us to predict. This is how well we can do at a preliminary stage.
+
+&lt;img src="slides_census_files/figure-html/unnamed-chunk-4-1.png" style="display: block; margin: auto;" /&gt;
+
+ - Looks like it's more challenging to find people with higher income than lower income, but surely they are of higher consumer value. Keep improving! 
+
+
+ 
+---
+### Know more about them 
+ - Now we know by what attributes/group membership can we find high income people, and how well we can find them.
+
+ - Finally, what if we want to design a detailed marketing message to some specific consumer segments/tribes? 
+ 
+ - Let' say, we'd like to not only find those with higher income but also know other group-level characteristics such as demographics and occupation, so that we can tailor our strategy? 
+ 
+So, we mined 7 segments in the population that help us understand who we can target and what are they like.
+
+---
+### Know more about them: 7 consumer segments
+
+<div id="htmlwidget-ccfdd7f3be6c4531e25a" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-ccfdd7f3be6c4531e25a">{"x":{"filter":"none","caption":"<caption>Consumer segment profiles: Cluster medoids with predicted probability of high income<\/caption>","data":[["Male","Male","Male","Male","Male","Female","Male"],[46,38,36,30,48,59,21],["Married","Married","Married","Never-married","Never-married","post-marriage","Never-married"],["Other","White","White","Black","White","White","White"],[13,10,9,10,10,9,9],["Adm-clerical","Protective-serv","Transport-moving","Protective-serv","missing","Other-service","Other-service"],[53,36,21,6,3,2,0],[6,20,18,22,14,3,18]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>Sex<\/th>\n      <th>Age<\/th>\n      <th>Marriage<\/th>\n      <th>Race<\/th>\n      <th>Education level<\/th>\n      <th>Job<\/th>\n      <th>% Probabiliy of &gt;50k income<\/th>\n      <th>Segment % in sample<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,4,6,7]}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+
+---
+###Going forward: applications
+ - Identification of high-income individual with machine learning
+ - Design targeted marketing messages to specific segments
+ - ...
+ 
+ 
+ THANK YOU!
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightStyle": "github",
+"highlightLines": true
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
