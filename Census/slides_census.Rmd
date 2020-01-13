@@ -22,6 +22,8 @@ background-image: url(images/roadmap.png)
 background-size: 100%
 background-position: 50% 280%
 
+
+## Setup
 ```{r setup, include=FALSE}
 #Set up default knitr chunk options
 library("knitr")
@@ -38,7 +40,6 @@ knitr::opts_chunk$set(
 )
 knitr::opts_knit$set(root.dir = "C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning/Census")
 options(htmltools.dir.version = FALSE)
-setwd("C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning/Census")
 ```  
 
 ```{r theme-map, include=FALSE}
@@ -62,21 +63,21 @@ theme_simplemap <- function(base_size = 9,
 ```
 
 ```{r load packages}
-#load packages.
 packages <- c(
-  "GGally",
-  "caret",
-  "corrplot",
-  "data.table",
-  "pROC",
   "tidyverse",
-  "stringr",
   "knitr",
   "ggplot2",
   "gridExtra",
   "FactoMineR",
   "factoextra",
-  "RColorBrewer"
+  "RColorBrewer",
+  "countrycode",
+  "qwraps2",
+  "sjstats",
+  "finalfit",
+  "fpc",
+  "tidymodels",
+  "parsnip"
 )
 packages <- lapply(
   packages,
@@ -90,9 +91,8 @@ packages <- lapply(
 select<-dplyr::select
 ```
 
-
+## Data preparation and EDA
 Before any modeling, the first step is to get an overview of the information and organization of variables in the dataset, based on which we perform basic data cleaning.
-
 We combine the training and test set during this stage and mark the train/test category in case we need to split them later on. 
 
 ```{r import data and print summary}
@@ -100,10 +100,12 @@ We combine the training and test set during this stage and mark the train/test c
 train <- read.csv("adult.data.csv",
                   header = FALSE,
                   stringsAsFactors = FALSE)
-test <- read.csv("adult.test.csv",
-                 header = FALSE,
-                 skip = 1,
-                 stringsAsFactors = FALSE)
+test <- read.csv(
+  "adult.test.csv",
+  header = FALSE,
+  skip = 1,
+  stringsAsFactors = FALSE
+)
 #combine train and test together
 dta <- rbind(cbind(set = rep("train", nrow(train)),
                    train),
@@ -131,46 +133,34 @@ str(dta)
 ```
 
 From the structure of data, the majority of the features are categorical.
-We also notice a redundant white space before strings, which we should take care of.
-From the documentation, the missing values are coded as ?. We transform it to the standard NA notation for R.
+We also notice a redundant white space before strings. We'll take care of that.
+From the documentation, the missing values are coded as '?'. We transform it to the standard 'NA' notation in R.
 After the basic manipulations, we print a summary to understand statistical distribution of variables.
 
-```{r}
+```{r print summary}
 #the weighting should have nothing to do with prediction
-dta<-dta%>%select(-fnlwgt)
+dta <- dta %>% select(-fnlwgt)
 
-#trim the white space 
+#trim the white space
 dta <- dta %>% mutate_if(is.character, str_trim)
 
 #recode ? and unknown to NA
-dta<-na_if(dta,"?")
+dta <- na_if(dta, "?")
 
 #print a summary
-library(qwraps2)
 options(qwraps2_markup = "markdown")
-summary.stats<-summary_table(dta)
-summary.stats
+summary_table(dta)
 ```
 
-The purpose of the analysis is not pure prediction, but to find the relationship between variables and extract insights for the general audience. Therefore, the variables need to be engineered so that the information can be understood by a normal reader. 
+### Recoding and transforming features
+The purpose of the analysis is not pure prediction, but to find the relationship between variables and extract insights for the general audience. 
+Therefore, the variables need to be engineered so that the categories should be simple enough to be understood by a normal human reader. 
 
-A characteristics of this dataset is that several variables contain very specific categories with extremely small portions. Such level of details cannot be comprehended by general audience and potential can cause overfitting. Therefore, some categories are binned to simplify the information and potentially reduce overfitting as well.
-
-An alternative way is PCA/MCA on several variables to reduce dimensionality. However, it adds difficulties in explaining things. 
-
-
-
-The categories of martial.status, relationship, and sex seem to have overlap in each other. We'd like to try some binning to reduce the redundancy.
-
-```{r}
-dta$relationship[dta$relationship%in%c("Husband","Wife")]<-"Married"
-```
+Several variables (e.g. nation of origin) contain very specific categories with extremely small portions. Such level of details cannot be comprehended by general audience and potentially can cause overfitting. Therefore, some categories are binned to avoid these cases.
 
 Country names have too many values and need to be binned.
 I recode countries other than the US, Mexico and Phillipines to the corresponding continent. The chi-square wasn't lowered much. 
-```{r}
-library(countrycode)
-library(sjstats)
+```{r recode nation of origin}
 dta$native.country[!dta$native.country %in% c("United-States")] <-
   countrycode(dta$native.country[!dta$native.country %in% c("United-States")],
               "country.name",
@@ -179,51 +169,57 @@ dta$native.country[!dta$native.country %in% c("United-States")] <-
 ```
 
 The capital gain/loss might be combined into capital profit 
-```{r}
-dta<-dta%>%mutate(profit=capital.gain-capital.loss)%>%select(-capital.gain,
-                                                             -capital.loss)
+```{r recode capital gain}
+dta <-
+  dta %>% mutate(profit = capital.gain - capital.loss) %>% select(-capital.gain,-capital.loss)
 ```
 
 The income is coded incorrectly. 
-```{r}
+```{r recode income}
 #recode income
-dta$income[dta$income=="<=50K."]<-"<=50K"
-dta$income[dta$income==">50K."]<-">50K"
+dta$income[dta$income == "<=50K."] <- "<=50K"
+dta$income[dta$income == ">50K."] <- ">50K"
+dta$income[dta$income == "<=50K"] <- "Income <= 50K"
+dta$income[dta$income == ">50K"] <- "Income > 50K"
 ```
 
-
 Of course, we try to minimize the variance loss during binning. Therefore, we produce contigency tables with chi-square to decide which categories to merge together. 
-```{r binning categorical variables and transform some features}
-library(sjstats)
-#recode character to factor
-for (i in names(dta%>%select(-income))){
-  if (class(dta[[i]])=="character"){
-    i%>%print()
-    cramer(as.formula(paste("income~",i,sep = "")),dta)%>%print()
-    table(dta[[i]], dta$income)%>%print()
+```{r print contigency tables}
+for (i in names(dta %>% select(-income))) {
+  if (class(dta[[i]]) == "character") {
+    i %>% print()
+    cramer(as.formula(paste("income~", i, sep = "")), dta) %>% print()
+    table(dta[[i]], dta$income) %>% print()
   }
 }
 ```
 
-
-```{r}
-#recode workingclass 
-dta$workingclass[dta$workingclass%in%c("Federal-gov","Local-gov","State-gov")]<-"Government"
-dta$workingclass[dta$workingclass%in%c("Self-emp-inc","Self-emp-not-inc")]<-"Self-employed"
-dta$workingclass[dta$workingclass%in%c("Never-worked","Without-pay")]<-"No work/pay"
+```{r binning working class martial and race}
+#recode workingclass
+dta$workingclass[dta$workingclass %in% c("Federal-gov", "Local-gov", "State-gov")] <-
+  "Government"
+dta$workingclass[dta$workingclass %in% c("Self-emp-inc", "Self-emp-not-inc")] <-
+  "Self-employed"
+dta$workingclass[dta$workingclass %in% c("Never-worked", "Without-pay")] <-
+  "No work/pay"
 #recode martial.status
-dta$martial.status[dta$martial.status%in%c("Married-AF-spouse","Married-civ-spouse")]<-"Married"
-dta$martial.status[dta$martial.status%in%c("Divorced","Married-spouse-absent","Separated","Widowed")]<-"post-marriage"
+dta$martial.status[dta$martial.status %in% c("Married-AF-spouse", "Married-civ-spouse")] <-
+  "Married"
+dta$martial.status[dta$martial.status %in% c("Divorced", "Married-spouse-absent", "Separated", "Widowed")] <-
+  "post-marriage"
 #Race
-dta$race[dta$race%in%c("Amer-Indian-Eskimo","Asian-Pac-Islander")]<-"Other"
+dta$race[dta$race %in% c("Amer-Indian-Eskimo", "Asian-Pac-Islander")] <-
+  "Other"
+#Too many categories in occupation and no apparent good way of recoding, leave it as it is
 ```
 
+
+### Missing value imputation
 Next, we'd deal with the missing values in the data.
 ```{r print missing value summary}
-library(finalfit)
 ff_glimpse(dta)
 ```
-Three factors contain missing values. We'd like to see whether the missing can be by random or not, so that we can decide about ways to impute them.
+Two factors contain missing values: occupation and working class. We'd like to see whether the missing can be by random or not, so that we can decide about ways to impute them.
 
 ```{r observe pattern of missingness}
 dta %>% select(workingclass, occupation, native.country) %>% missing_pattern()
@@ -231,126 +227,309 @@ dta %>% select(workingclass, occupation, native.country) %>% missing_pattern()
 
 The missingness in workingclass and occupation highly correlates with each other. We should guess whether it's MAR or MNAR
 
-```{r}
+```{r missing pattern of working class}
 dta %>% missing_compare("workingclass",
                         c("age", "education.num", "profit"))
 ```
 
-The missingness in working-related information seems not by random. Those missing the information tend to be older, receive less education, be less active in investment activities. Therefore, we recode the missing value with "missing" label
+The missingness in working-related information seems not by random. Those missing the information tend to be older, receive less education, be less active in investment activities. Therefore, statistical imputing would introduce bias and we simply recode the missing value with "missing" label in order not to lose the "non-randomness" in the missing values.
 
-```{r}
-dta$workingclass[is.na(dta$workingclass)==TRUE]<-"missing"
-dta$occupation[is.na(dta$occupation)==TRUE]<-"missing"
+```{r impute working class and occupation}
+dta$workingclass[is.na(dta$workingclass) == TRUE] <- "missing"
+dta$occupation[is.na(dta$occupation) == TRUE] <- "missing"
 ```
 
-```{r}
+
+For any modeling, we need to transform character to factor.
+```{r character to factor}
 #recode character to factor
-for (i in names(dta)){
-  if (class(dta[[i]])=="character"){
-    dta[[i]]<-dta[[i]]%>%as.factor()
+for (i in names(dta)) {
+  if (class(dta[[i]]) == "character") {
+    dta[[i]] <- dta[[i]] %>% as.factor()
   }
 }
 ```
 
-
-#EDA: segmentation
+## EDA: Correspondence analysis
 What attributes are associated with higher income? 
 The variables in this data are mostly categorical. The way to understand the relationship between variables are thus different from the continous variable case. 
 
-Unlike dataset where we can produce a correlation matrix, it's not easy to understand the relationship between categorical and numeric features in mixed data. Since the majority of features in this data are categorical, we create from the few numeric features categorical variables and visualize the relationship between them with MCA, a principle component technique on categorical variables. This method might lose some information when we recode numeric features to categorical variable, but is very beneficial for visualizing the relationships of variables in a multi-variate setting.
+Unlike dataset where we can produce a correlation matrix, it's not easy to understand the relationship between categorical and numeric features in mixed data. Since the majority of features in this data are categorical, we create from the few numeric features categorical variables and visualize the relationship between them with MCA, a principal component technique on categorical variables. This method might lose some information when we recode numeric features to categorical variable, but is very beneficial for two purposes for us:
+1. Visualizing the relationships of variables in a multi-variate setting.
+2. Extract principal components from mixed data
 
-```{r}
-summary.stats<-cbind(summary_table(dta%>%filter(income=="<=50K")),
-                     summary_table(dta%>%filter(income==">50K"))
-                     )
+```{r data summary by income group}
+summary.stats <-
+  cbind(summary_table(dta %>% filter(income == "Income <= 50K")),
+        summary_table(dta %>% filter(income == "Income > 50K")))
 summary.stats
 ```
 
-```{r recode}
-dta$education.group<-dta$education.num%>%cut(c(-Inf,5,9,12,13,Inf),
-                                             labels = c("middle school",
-                                                        "high school",
-                                                        "associate",
-                                                        "bachelor",
-                                                        "master"
-                                                        ))
-dta$age.group<-dta$age%>%cut(c(-Inf,25,40,55,Inf),
-                             labels = c("<25 yrs old",
-                                        "25-40 yrs old",
-                                        "40-55 yrs old",
-                                        ">55 yrs old"))
-dta$hours.group<-dta$hours.per.week%>%cut(c(-Inf,39,40,Inf),
-                                          labels = c("work undertime",
-                                                     "work regular hours",
-                                                     "work overtime"),)
-dta$profit.group<-dta$profit%>%cut(c(-Inf,-1,0,Inf),
-                                   labels = c("has investment",
-                                              "no investment",
-                                              "has investment"))
+```{r recode numeric to factor for famd}
+dta$education.group <- dta$education.num %>% cut(
+  c(-Inf, 5, 9, 12, 13, Inf),
+  labels = c(
+    "Middle school",
+    "High school",
+    "Associates",
+    "Undergrad education",
+    "Graduate education"
+  )
+)
+dta$age.group <- dta$age %>% cut(
+  c(-Inf, 25, 40, 55, Inf),
+  labels = c("<25 yrs old",
+             "25-40 yrs old",
+             "40-55 yrs old",
+             ">55 yrs old")
+)
+dta$hours.group <- dta$hours.per.week %>% cut(c(-Inf, 39, 40, Inf),
+                                              labels = c("Work undertime",
+                                                         "Work regular hours",
+                                                         "Work overtime"),
+)
+dta$profit.group <- dta$profit %>% cut(
+  c(-Inf, -1, 0, Inf),
+  labels = c(
+    "Has capital investment",
+    "No investment",
+    "Has capital investment"
+  )
+)
 ```
 
 Because occupation variable contains many categories and there's not a very efficient way to recode them, we didn't include it in the analysis. All other variables are included. 
 
 
-##Analysis 
+##Visualize relationship between variables
+```{r making plots}
+#construct summary statistics by education, profit, martial status etc. to set up ggplot data infrastructure
+education.plot <- ggplot(
+  data = dta %>% group_by(education.group, income) %>% summarise(percent =
+                                                                        n() * 100 / nrow(dta)) %>% mutate(group = str_c(education.group, " and income", income)),
+  aes(x = education.group,
+      y = percent,
+      fill = income)
+)
 
-```{r}
-library("FactoMineR")
-library("factoextra")
+profit.plot <- ggplot(
+  data = dta %>% group_by(profit.group, income) %>% summarise(percent =
+                                                                     n() * 100 / nrow(dta)) %>% mutate(group = str_c(profit.group, " and income", income)),
+  aes(x = profit.group,
+      y = percent,
+      fill = income)
+)
+
+martial.status.plot <- ggplot(
+  data = dta %>% group_by(martial.status, income) %>% summarise(percent =
+                                                                       n() * 100 / nrow(dta)) %>% mutate(group = str_c(martial.status, " and income", income)),
+  aes(x = martial.status,
+      y = percent,
+      fill = income)
+)
+
+race.plot <- ggplot(
+  data = dta %>% group_by(race, income) %>% summarise(percent =
+                                                             n() * 100 / nrow(dta)) %>% mutate(group = str_c(race, " and income", income)),
+  aes(x = race,
+      y = percent,
+      fill = income)
+)
+
+#my function to make the plots and make them prettier
+formatting <- function(plot, legend = FALSE) {
+  plot <- plot +
+    geom_bar(stat = "identity") +
+    scale_fill_brewer(palette = "Paired") +
+    xlab("") +
+    ylab("") +
+    labs(fill = "Income")  +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  if (legend == FALSE) {
+    plot <- plot +
+      theme(legend.position = "none")
+  }
+  return(plot)
+}
+
+#combine the 4 plots together in 1 page
+var.plot <- grid.arrange(
+  race.plot %>% formatting(),
+  education.plot %>% formatting(),
+  martial.status.plot %>% formatting(),
+  profit.plot %>% formatting(legend = TRUE),
+  top = "Who tend to have high income? Some examples.",
+  left = "Percentage"
+)
+
+var.plot
+```
+
+
+Here, the MCA is used to visualize categorical groups that have higher likelihood to overlap with higher income groups
+```{r construct and visualize MCA}
+#select the necessary features into MCA.
+#All variables but occupation are included. Too many categories in occupation will make the plot unreadable.
 dta_famd <-
-  dta %>%  select_if(is.factor) %>% filter(!race %in% c("Other"),!native.country %in%
-                                             c("Not matched")) %>% select(sex,
-                                                                          education.group,
-                                                                          race,
-                                                                          martial.status,
-                                                                          income,
-                                                                          native.country,
-                                                                          age.group,
-                                                                          hours.group,
-                                                                          profit.group,
-                                                                          workingclass
-                                                                          )
-
+  dta %>%  filter(!race %in% c("Other"),!native.country %in% c("Not matched")) %>% select(#get ride of a few outliers 
+                      income,
+                      sex,
+                      education.group,
+                      race,
+                      martial.status,
+                      native.country,
+                      age.group,
+                      hours.group,
+                      profit.group,
+                      workingclass
+                    )
+#Construct the MCA
 res.famd <- FAMD (dta_famd,
-                  ncp = 3,
-                  ind.sup = NULL,
+                  ncp = 2,#This MCA is not for clustering purpose, so we just use 2 components and visualize them on a plot
                   graph = FALSE)
 
+#build the visualization of 2 principal components
 quali.var <- get_famd_var(res.famd, "quali.var")
-fviz_famd_var(
+mca.plot<-fviz_famd_var(
   res.famd,
   "quali.var",
   repel = TRUE,
-  col.var = "contrib",
-  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")
+  col.var = "black"
+) + 
+ theme_void()+
+  xlab("") +
+  ylab("") +
+  labs(title = "A more comprehensive view",
+       subtitle = "Groups on the left tend to have lower income, and groups on the right tend to have higher income",
+       caption = "From Multiple Correspondence Analysis (MCA) result")+
+  theme(
+  panel.background = element_rect(fill = "lightyellow1"))
+
+mca.plot
+```
+
+
+#Modeling
+Not only do we want to understand the relationship between income category and other variables, we'd also want to understand how much is the contribution to higher income from each factor. A regression model allows to observe the impact controlling other factors, therefore it's the most appropriate choice given the objective of "What are the key factors contributing to high vs. low income?"
+
+Because of a lot of categorical variables in the data, overfitting can be easy. Therefore, although the purpose is prediction, we use cross-validation to conduct the analysis.
+
+For this part, I use tidymodels, an R package that is similar to scikit-learn library to build and train the model
+
+```{r train test split}
+dta_modeling <- dta %>% select(
+  set,
+  income,
+  age,
+  workingclass,
+  education.num,
+  martial.status,
+  occupation,
+  relationship,
+  race,
+  sex,
+  hours.per.week,
+  native.country,
+  profit
 )
+train <- dta_modeling %>% filter(set == "train") %>% select(-set)
+test <- dta_modeling %>% filter(set == "test") %>% select(-set)
 ```
 
-Follow with K-means on returned clusters
-```{r}
-dta_km<-dta%>%select(age,
-                     sex,
-                     race,
-                     native.country,
-                     education.num,
-                     workingclass,
-                     occupation,
-                     hours.per.week,
-                     martial.status,
-                     relationship,
-                     profit,
-                     income)%>%sample_n(1000)
-g.dist <- cluster::daisy(dta_km, metric = "gower")
+For the feature preprocessing, because the objective of the task is not going for the highes accuracy but have some interpretability, I didn't one-hot-encode, scale or normalize the features. These steps are useful for better accuracy but make it hard to interpret the coefficients. 
+```{r set up formula and preprocessing with tidymodels}
+#build formula
+formula.1<-formula(income ~ .)
+
+#modeling framework
+recipe_simple <- function(dataset) {
+  recipe(formula.1, 
+         data = dataset) %>%
+    step_string2factor(all_nominal(), -all_outcomes()) %>%
+    prep(data = dataset)
+}
+
+#only use train set for recipe to prevent information leakage between train and test
+recipe_prepped <- recipe_simple(dataset = train)
+
+#conduct the preprocessing
+train_baked <- bake(recipe_prepped, new_data = train)
+test_baked  <- bake(recipe_prepped, new_data = test)
 ```
 
-```{r}
-library(fpc)
+Because of the binary nature of outcome variable, we use logistic regression. 
+Since we already engineered the features and want to observe the impact from factors, I didn't penalize the regression.
+
+```{r train the glm model}
+logistic_glm <-
+  logistic_reg(mode = "classification") %>%
+  set_engine("glm") %>%
+  fit(formula.1, data = train_baked)
+```
+
+```{r inspect the coefficients}
+summary_logit<-logistic_glm$fit%>%summary()
+coefficients_table<-summary_logit$coefficients%>%as.data.frame()
+coefficients_table<-bind_cols(var=rownames(coefficients_table),
+                          coef=coefficients_table$Estimate*100,
+                          p=coefficients_table$`Pr(>|z|)`
+                          )%>%as.data.frame()%>%mutate(coef=coef%>%round(2))
+coefficients_table<-coefficients_table[order(coefficients_table$coef,decreasing = TRUE),]
+
+coef.plot <- ggplot(
+  data = coefficients_table%>%head(15)%>%filter(var!="occupationmissing"),
+  aes(x = var%>% reorder(coef),
+      y = coef)
+) +
+    geom_bar(stat = "identity",
+             fill = "darkseagreen3") +
+    xlab("") +
+    ylab("") +
+    labs(fill = "Income")  +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+coef.plot
+```
+
+##With medoisd prediction
+Here, we use K-medoid algorithm instead of traditional K-means, because 
+1. The input data is mixed type containing categorical, ordinal and numeric data. 
+2. 
+It's more computationally expensive compared with K-means, so I only sample 10% of the data in this assignment. 
+```{r principal component analysis with mixed data on sampled test set}
+set.seed(1)
+dta_famd_1 <-
+  dta %>%filter(set=="test") %>%select(
+    income,
+    sex,
+    education.num,
+    race,
+    martial.status,
+    relationship,
+    native.country,
+    age,
+    hours.per.week,
+    profit,
+    workingclass,
+    occupation
+  )%>%sample_frac(0.1)
+res.famd_1 <- FAMD (dta_famd_1,
+                    ncp = 5,
+                    sup.var = 1,
+                    ind.sup = NULL,
+                    graph = FALSE)
+km_input<-res.famd_1$ind$coord%>%as.data.frame()
+```
+
+```{r My own function that bootstraps K-medoid using PAM algorithm from package fpc}
 cluster_test <- function(num, nboot) {
   set.seed(1)
   class_pamk <- fpc::clusterboot(
-    g.dist,
+    km_input,
     B = nboot,
-    distances = TRUE,
+    distances = FALSE,
     bootmethod = "boot",
     multipleboot = TRUE,
     dissolution = 0.5,
@@ -368,150 +547,87 @@ cluster_test <- function(num, nboot) {
 ```
 
 ```{r, eval=FALSE}
-class_pamk_2 <- cluster_test(2, 100)
+class_pamk_3 <- cluster_test(3, 50)
 ```
 
 ```{r, eval=FALSE}
-class_pamk_3 <- cluster_test(3, 100)
-#save(class_pamk_3, file = "class_pamk_3.RData")
+class_pamk_4<-cluster_test(4,50)
 ```
 
 ```{r, eval=FALSE}
-class_pamk_4<-cluster_test(4,100)
+class_pamk_5<-cluster_test(5,50)
 ```
 
 ```{r, eval=FALSE}
-class_pamk_5<-cluster_test(5,100)
+class_pamk_6<-cluster_test(6,50)
 ```
 
 ```{r, eval=FALSE}
-class_pamk_6<-cluster_test(6,100)
+class_pamk_7<-cluster_test(7,50)
+pamk_mod <- class_pamk_7
+save(pamk_mod,file="pamk_mod.RData")
 ```
 
 ```{r, eval=FALSE}
-class_pamk_7<-cluster_test(7,100)
+class_pamk_8<-cluster_test(8,50)
 ```
 
 ```{r, eval=FALSE}
-class_pamk_8<-cluster_test(8,100)
+class_pamk_9<-cluster_test(9,50)
 ```
 
 ```{r}
-pamk_mod<-class_pamk_5
-pamk_dta<-cbind(dta_km,
-                cluster=pamk_mod$pamobject$clustering)
-medoid <- cbind(dta_km,
-                row = seq(1,nrow(pamk_dta),1))%>%filter(row%in%pamk_mod$pamobject$id.med)
+load("pamk_mod.RData")
+cluster_size <- pamk_mod$pamobject$clusinfo[, 1]
+medoid <- cbind(id = seq(1, nrow(dta_famd_1), 1),
+                dta_famd_1) %>% filter(id %in% pamk_mod$pamobject$id.med) %>%
+  cbind(size = (cluster_size / nrow(dta_famd_1)))
+```
+ 
+```{r}
+predictions_medoid_glm <- cbind(logistic_glm %>%
+                                  predict(new_data = medoid, type = "prob"),
+                                medoid %>% select(-id))
+predictions_medoid_glm<-predictions_medoid_glm[order(predictions_medoid_glm$`.pred_Income > 50K`,decreasing = TRUE),]
+predictions_medoid_glm%>%data.table::data.table()
 ```
 
-
-#Modeling
-Not only do we want to understand the relationship between income category and other variables, we'd also want to provide a ceteris paribus condition with regression analysis. Because of a lot of categorical variables in the data, overfitting can be easy. Therefore, although the purpose is prediction, we use cross-validation to conduct the analysis. Moreover, by using LASSO, we can select features. 
-
-```{r}
-library(tidymodels)
-library(parsnip)
-train<-dta%>%filter(set=="train")%>%select(-set)
-test<-dta%>%filter(set=="test")%>%select(-set)
-```
-
-```{r}
-formula.1<-formula(income ~ 
-            age+
-            workingclass+
-            education.num+
-            martial.status+
-            occupation+
-            relationship+
-            race+
-            sex+
-            hours.per.week+
-            native.country+
-            profit)
-
-recipe_simple <- function(dataset) {
-  recipe(formula.1, 
-         data = dataset) %>%
-    step_string2factor(all_nominal(), -all_outcomes()) %>%
-    prep(data = dataset)
-}
-
-recipe_prepped <- recipe_simple(dataset = train)
-
-train_baked <- bake(recipe_prepped, new_data = train)
-test_baked  <- bake(recipe_prepped, new_data = test)
-```
-
-```{r}
-logistic_glm <-
-  logistic_reg(mode = "classification") %>%
-  set_engine("glm") %>%
-  fit(formula.1, data = train_baked)
-```
-
-```{r}
-logistic_glm$fit%>%summary()
-```
-
-```{r}
+```{r inspect errors}
 predictions_glm <- logistic_glm %>%
   predict(new_data = test_baked) %>%
   bind_cols(test_baked %>% select(income))
 
-predictions_glm %>%
-  conf_mat(income,.pred_class) %>%
-  pluck(1) %>%
-  as_tibble() %>%
-  ggplot(aes(Prediction, Truth, alpha = n)) +
-  geom_tile(show.legend = FALSE) +
-  geom_text(aes(label = n), colour = "white", alpha = 1, size = 8)
-```
-
-```{r}
-predictions_glm %>%
+accuracy <- predictions_glm %>%
   metrics(income, .pred_class) %>%
   select(-.estimator) %>%
   filter(.metric == "accuracy")
-```
 
-##With medoisd prediction
-```{r}
-predictions_medoid_glm <- logistic_glm %>%
-  predict(new_data = medoid)%>%
-  bind_cols(medoid %>% select(income))
+prediction.plot<-predictions_glm %>%
+  conf_mat(income, .pred_class) %>%
+  pluck(1) %>%
+  as_tibble() %>%
+  ggplot(aes(Prediction, Truth, alpha = n)) +
+  geom_tile(fill="cyan4",
+            show.legend = FALSE) +
+  geom_text(aes(label = n),
+            colour = "black",
+            alpha = 1,
+            size = 8) +
+  labs(
+    title = str_c(
+      "Overall prediction accuracy: ",
+      100 * accuracy$.estimate %>% round(4),
+      "%"
+    ),
+    subtitle = "Easier to predict lower income groups",
+    caption = "Result from logistic regression model"
+  ) +
+  theme_classic()
+prediction.plot
 ```
 
 
 ---
-##Project summary
-
- - Mission: Predicting client subscription to a term product
- 
- - Data: Direct marketing campaign results
-
- - Exploratory data analysis:
- 
-MCA with categorical variables, correlation matrix and PCA with numerics
-
- - Data preprocessing:
- 
-Missing value imputation, one hot encoding, scaling, train/test split, under-sampling training set
-
- - Model training and comparison:
- 
-Logistic regression, support vector machine, random forest
-
- - Model selection:
- 
-Random forest (82% accuracy without hyperparameter tuning)
- 
- - Future use cases:
-
-1. Customer portraits supporting target marketing
-2. Predictive information product for campaign operations
+```{r}
 
 
-
-
-
- - strategy: just do all categorical
