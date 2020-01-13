@@ -291,6 +291,9 @@ dta$profit.group<-dta$profit%>%cut(c(-Inf,-1,0,Inf),
 
 Because occupation variable contains many categories and there's not a very efficient way to recode them, we didn't include it in the analysis. All other variables are included. 
 
+
+##Analysis 
+
 ```{r}
 library("FactoMineR")
 library("factoextra")
@@ -309,7 +312,7 @@ dta_famd <-
                                                                           )
 
 res.famd <- FAMD (dta_famd,
-                  ncp = 2,
+                  ncp = 3,
                   ind.sup = NULL,
                   graph = FALSE)
 
@@ -324,6 +327,83 @@ fviz_famd_var(
 ```
 
 Follow with K-means on returned clusters
+```{r}
+dta_km<-dta%>%select(age,
+                     sex,
+                     race,
+                     native.country,
+                     education.num,
+                     workingclass,
+                     occupation,
+                     hours.per.week,
+                     martial.status,
+                     relationship,
+                     profit,
+                     income)%>%sample_n(1000)
+g.dist <- cluster::daisy(dta_km, metric = "gower")
+```
+
+```{r}
+library(fpc)
+cluster_test <- function(num, nboot) {
+  set.seed(1)
+  class_pamk <- fpc::clusterboot(
+    g.dist,
+    B = nboot,
+    distances = TRUE,
+    bootmethod = "boot",
+    multipleboot = TRUE,
+    dissolution = 0.5,
+    recover = 0.7,
+    count = FALSE,
+    showplots = FALSE,
+    clustermethod = fpc::pamkCBI,
+    k = num,
+    criterion = "asw",
+    usepam = TRUE
+  )
+  class_pamk %>% print()
+  return(class_pamk$result$result)
+}
+```
+
+```{r, eval=FALSE}
+class_pamk_2 <- cluster_test(2, 100)
+```
+
+```{r, eval=FALSE}
+class_pamk_3 <- cluster_test(3, 100)
+#save(class_pamk_3, file = "class_pamk_3.RData")
+```
+
+```{r, eval=FALSE}
+class_pamk_4<-cluster_test(4,100)
+```
+
+```{r, eval=FALSE}
+class_pamk_5<-cluster_test(5,100)
+```
+
+```{r, eval=FALSE}
+class_pamk_6<-cluster_test(6,100)
+```
+
+```{r, eval=FALSE}
+class_pamk_7<-cluster_test(7,100)
+```
+
+```{r, eval=FALSE}
+class_pamk_8<-cluster_test(8,100)
+```
+
+```{r}
+pamk_mod<-class_pamk_5
+pamk_dta<-cbind(dta_km,
+                cluster=pamk_mod$pamobject$clustering)
+medoid <- cbind(dta_km,
+                row = seq(1,nrow(pamk_dta),1))%>%filter(row%in%pamk_mod$pamobject$id.med)
+```
+
 
 #Modeling
 Not only do we want to understand the relationship between income category and other variables, we'd also want to provide a ceteris paribus condition with regression analysis. Because of a lot of categorical variables in the data, overfitting can be easy. Therefore, although the purpose is prediction, we use cross-validation to conduct the analysis. Moreover, by using LASSO, we can select features. 
@@ -391,8 +471,16 @@ predictions_glm %>%
 predictions_glm %>%
   metrics(income, .pred_class) %>%
   select(-.estimator) %>%
-  filter(.metric == "accuracy") 
+  filter(.metric == "accuracy")
 ```
+
+##With medoisd prediction
+```{r}
+predictions_medoid_glm <- logistic_glm %>%
+  predict(new_data = medoid)%>%
+  bind_cols(medoid %>% select(income))
+```
+
 
 ---
 ##Project summary
