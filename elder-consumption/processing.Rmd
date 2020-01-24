@@ -1,0 +1,244 @@
+---
+title: "Leisure"
+author: "Langyi Tian and Aurelien Boucher"
+output: html_document
+---
+```{r setup, include=FALSE}
+#Set up default knitr chunk options
+library("knitr")
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.height = 6,
+  fig.width = 16,
+  fig.align = "center"
+)
+```  
+
+Stata Setup
+```{r call stata}
+library(Statamarkdown)
+```
+
+## Data preparation
+### Data import and merge
+
+Import and modify adult dataset, ready to merge into family dataset
+
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+use if urban16==1 using "data\ecfps2016adult_201906.dta", clear
+rename pid resp1pid
+rename cfps_age age
+rename cfps_gender gender
+rename cfps2016edu education
+rename qg303code_egp egp
+rename qg303code_isei isei
+rename pa301 hukou
+rename qn4001 party
+rename fml2016_count familysize
+save "data\adult_temp.dta", replace
+```
+
+left join family and adult data set, save
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+use if urban16==1 using "data\ecfps2016famecon_201807.dta", clear
+merge m:m resp1pid using "data\adult_temp.dta", keepusing(resp1pid age gender education egp isei hukou party familysize)
+keep if _merge==3
+save "data\family_merged.dta", replace
+```
+
+### Engineer some attributes
+keep only urban residents
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+use if urban16==1 using "data\family_merged.dta", clear
+```
+
+generate features related to leisure, travel, dressing and beauty
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+rename fp502 leisure
+rename fp503 travel
+rename dress dressing
+rename fp513 beauty
+
+*generate expenses on leisure, travel, dressing and beauty
+
+foreach var of varlist leisure travel dressing beauty {
+  recode `var' min/-1=. //recode missing value
+  gen `var'_pr = (100 * `var') / pce //generate percentage of total expense
+  recode `var'_pr 100/max=100 //create censorship
+  summarize `var' `var'_pr //check outcome
+}
+
+*create total expense of the four items
+
+gen allvalue= leisure + travel
+gen allpr= leisure_pr + travel_pr
+summarize allvalue allpr
+```
+
+ - generate variables indicating real estate value of a household 
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+foreach var of varlist fq6 fr2 {
+  
+*for the property they live in
+  
+  recode `var' -8=0 //recode zero value
+  recode `var' -2=. -1=. //recode missing value
+  
+*for other properties
+  
+  recode `var'_est -8=0
+  recode `var'_est -2=. -1=.
+  replace `var' = `var'_est if `var'==.
+  summarize `var' `var'_est
+}
+
+*generate total value of housing asset
+
+gen homevalue=.
+replace homevalue=fq6 if fq6!=.
+replace homevalue=fq6 + fr2 if fr2!=.
+summarize homevalue
+```
+
+add control variable: privincial level gdp per capita in 2016
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+gen gdp=16278 if provcd16==11
+replace gdp=17131 if provcd16==12 //Tianjin
+replace gdp=6509 if provcd16==13 //Hebei
+replace gdp=5709 if provcd16==14 //Shanxi
+replace gdp=11566 if provcd16==15  //Neimeng
+replace gdp=10614 if provcd16==21 //Liaoning
+replace gdp=8166 if provcd16==22 //Jilin
+replace gdp=6386 if provcd16==13 //Heilongjiang
+replace gdp=15851 if provcd16==31 //Shanghai
+replace gdp=13328 if provcd16==32 //Jiangsu
+replace gdp=11884 if provcd16==33 //Zhejiang
+replace gdp=5604 if provcd16==34 //Anhui
+replace gdp=10333 if provcd16==35 //Fujian
+replace gdp=5645 if provcd16==36 //Jiangxi
+replace gdp=9911 if provcd16==37 //Shandong
+replace gdp=6035 if provcd16==41 //Henan
+replace gdp=7675 if provcd16==42 //Hubei
+replace gdp=6556 if provcd16==43 //Hunan
+replace gdp=10332 if provcd16==44 //Guangdong
+replace gdp=5387 if provcd16==45 //Guangxi
+replace gdp=6337 if provcd16==46 //Hainan
+replace gdp=7790 if provcd16==50 //Chongqin
+replace gdp=5719 if provcd16==51 //Sichuan
+replace gdp=4304 if provcd16==52 //Guizhou
+replace gdp=4438 if provcd16==53 //Yunan
+replace gdp=7640 if provcd16==61 //Shanxi
+replace gdp=4303 if provcd16==62 //Gansu
+replace gdp=6810 if provcd16==64 //Ningxia
+replace gdp=6617 if provcd16==65 //Xinjiang
+summarize gdp
+```
+
+rename a few other variables
+
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+rename fincome1 income
+```
+
+Final feature engineering
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+gen allvalue_flag = 1 if allvalue>0
+replace allvalue_flag = 0 if allvalue==0
+gen allvalue_log=log(allvalue + 1)
+gen allpr_log=log(allpr + 1)
+gen income_log=log(income + 50)
+gen homevalue_log=log(homevalue + 1)
+summarize allvalue_flag allvalue_log allpr_log income_log homevalue_log
+```
+
+keep relevant features
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+keep resp1pid age gender education egp hukou party familysize income_log homevalue_log isei allvalue_flag allvalue_log allpr_log gdp
+```
+
+Save the final data
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+codebook, compact
+save "data\family_merged_tidy.dta", replace
+```
+
+## Modeling
+### Missing value handling
+
+Missingness overview
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+use "data\family_merged_tidy.dta", replace
+ssc install mdesc
+mdesc
+```
+
+visualize missing patterns
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+misstable patterns egp isei education
+```
+
+t-test of target variable between missing/non missing parts of variables
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+foreach var of varlist egp isei education{
+  gen `var'_flag=1
+  replace `var'_flag=0 if `var'==.
+  ttest income_log, by(`var'_flag)
+}
+```
+
+The occupation info should be MNAR
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+* recoded into extreme values
+recode isei .=9999
+recode egp .=9999
+```
+
+Turns out education might be MAR
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+* imputed with mice along with other vars
+mi set mlong
+mi register imputed income_log hukou education homevalue_log
+mi impute mvn income_log hukou education homevalue_log = age gender familysize party, add(5) rseed (0)
+```
+
+### Logit model 
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+mi estimate: logit allvalue_flag age gender familysize hukou isei party education income_log homevalue_log if age > 60
+```
+
+### OLS model
+build a regession
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+mi estimate: regress allvalue_log age gender familysize hukou isei party education income_log homevalue_log gdp if allvalue_log>0 & age > 60
+```
+
+build another regession
+```{stata, collectcode=TRUE, echo=FALSE, cleanlog=FALSE}
+mi estimate: regress allpr_log age gender familysize hukou isei party education income_log homevalue_log gdp if allpr_log>0 & age > 60
+```
+
+## Exploratory analysis in R
+```{r packages, include=FALSE}
+# Load packages.
+packages <- c("tidyverse",
+              "knitr",
+              "finalfit",
+              "ggplot2",
+              "gridExtra"
+              )
+packages <- lapply(packages, FUN = function(x) {
+  if(!require(x, character.only = TRUE)) {
+    install.packages(x)
+  library(x, character.only = TRUE)
+  }
+}
+)
+```
+
+load the new dataset in r
+```{r}
+cfps<-haven::read_dta(file = "data/family_merged_tidy.dta")
+```
