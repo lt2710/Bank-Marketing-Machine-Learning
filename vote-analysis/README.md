@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 # Grace Hopper 2020 SMS analysis
 
 ## Data preparation technical note
