@@ -18,4 +18,4 @@ At an aggregated level, the SMS program showed a weak significance in increasing
 
 Within those we were able to interview, good news is that we see a significant positive impact of the SMS program on the support for Hopper. In a scale of 10 (0=strongly oppose, 10=strongly support), the treatment would increase around 0.4 degree of support. Moreover, such treatment effect seems to be universal among subgroups: after roughly checking regression tables for subgroup analysis, overall we didn't find significant differences in ATE across subgroups. 
 
-Going forward as to recommendation, when encouraging respondents to vote, it's the best to target the efforts to subgroups where the ATE is larger (e.g. women). If the purpose is to increase general support for Hopper, the impact is largely universal thus the campaign can be directed to a wider audience.
+Going forward as to recommendation, when encouraging respondents to vote, it's the best to target the efforts to subgroups where the ATE is larger and positive (e.g. women). If the purpose is to increase general support for Hopper, the impact is largely universal thus the campaign can be directed to a wider audience.
