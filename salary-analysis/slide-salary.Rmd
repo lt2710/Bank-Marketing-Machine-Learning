@@ -126,7 +126,7 @@ wilcox.test(salary~sex,data = dta)
 ---
 # Analysis
 (3) What is the distribution of salary by rank and discipline?
-```{r,fig.height=3}
+```{r,fig.height=3.5}
 rank_plot <- ggplot(dta,
                     aes(x = rank %>% reorder(dta$salary),
                         y = salary)) +
@@ -148,13 +148,12 @@ grid.arrange(plot_pretty(rank_plot),
              plot_pretty(discipline_plot),
              nrow = 1)
 ```
- - We can see higher tank is associated with higher salary. Discipline B enjoys more than A. 
+ - We can see higher tank and discipline B (compared with A)is associated with higher salary.
 
 (4) How would you recode discipline as a 0/1 binary indicator?
 
 ```{r, echo=TRUE}
-#a typical way to dummy code to avoid redundancy/collinearity
-discipline_B<-(dta$discipline=="B")%>%as.numeric()#will use dplyr::mutate if manipulating a dataframe
+discipline_B<-(dta$discipline=="B")%>%as.numeric()#dummy code it to avoid redundancy/collinearity. will use dplyr::mutate if manipulating a dataframe
 ```
 
 ```{r}
@@ -168,25 +167,31 @@ exclude: true
 missing_glimpse(dta)
 ```
 ---
-#Modeling: Data preparation
+#Modeling I: Data preparation
 
- - There is no unique id column so we assume there's no duplicates. 
- - The data is complete with no need for missing value imputations
+ - Assume no duplicates due to no unique id column
+ - No need for missing value imputations as the data is complete
  - Years since phd and years of service is strongly correlated.
 ```{r}
 cor.test(dta$yrs.since.phd, dta$yrs.service, method="pearson")
 ```
- - We manually construct a variable measuring gap between year of phd graduation and year starting service
- 
-```{r, echo=TRUE}
-dta<-dta%>%mutate(gap=yrs.since.phd-yrs.service)%>%select(-yrs.since.phd)
-```
----
-#Modeling: Train/test split
 
- - We don't have many records, so use 80% records to train data 
- - For hyperparameter tuning, we use 5-fold CV inside the training set
- 
+```{r, echo=TRUE}
+dta<-dta%>%mutate(gap=yrs.since.phd-yrs.service)#manually construct a variable measuring gap between year of phd graduation and year starting service
+```
+
+```{r}
+dta<-dta%>%select(-yrs.since.phd)
+summary(dta$gap)
+```
+
+---
+#Modeling I: Preprocessing
+
+ - Use 80% records to train data since we don't have a big sample
+ - Apply 5-fold CV inside the training set for hyperparameter tuning (to make things faster)
+ - The preprocessing steps (recipe object in tidymodels framework):
+
 ```{r}
 set.seed(1)
 #initial 8:2 split betwee train test set
@@ -197,7 +202,6 @@ test  <- testing(dta_split)
 vfold <- vfold_cv(train, v = 5)
 ```
 
- - The preprocessing steps:
 ```{r}
 #modeling framework
 formula.reg <- as.formula(salary ~ .)
@@ -205,7 +209,7 @@ salary_rec <- recipe(formula.reg,
                      data = train) %>%
   step_log(all_outcomes(), base = 10) %>%
   step_string2factor(all_nominal(),-all_outcomes()) %>%
-  step_dummy(all_nominal()) %>%
+  step_dummy(all_nominal(),-all_outcomes()) %>%
   step_poly(yrs.service, degree = 2)  %>%
   step_normalize(all_predictors(),-all_nominal())
 
@@ -213,9 +217,11 @@ salary_rec
 ```
 
 ---
-#Modeling: Tidymodels framework
+#Modeling I: Modeling choice
 
- - Start with a penalized regression as baseline. Quick and interpratable. 
+ - Start with a general penalized regression as baseline. 
+ - It's quick, interpratable, and can usually serve as variable selection for subsequent modeling. 
+ - The model definition:
  
 ```{r}
 #define glmn model
@@ -227,9 +233,10 @@ glmn_model
 ```
 
 ---
-#Modeling: Tuning the best model
+#Modeling I: Tuning the best model
 
- - We use a random grid search for mixture and penalty with 10 levels for each.
+ - We use a random grid searching 10 levels for each of mixture and penalty
+ - We use RMSE as the metric to evaluate performance to give a relatively high weight to large errors since it's usually difficulty to predict them in salary
  
 ```{r,results=FALSE}
 #define parameter grid
@@ -268,34 +275,38 @@ best_glmn
  - The penalty and mixture are relatively small, showing that most variables have good prediction power
 
 ---
-#Modeling: Variable importance
+#Modeling I: Variable importance
 ```{r}
 #finalize the recipe
 final_rec <- salary_rec %>% prep()
 #finalize the best trained glmn model
 final_glmn_model <-
   glmn_model %>%
-  finalize_model(best_glmn) %>%
+  finalize_model(best_glmn) 
+fit_final_glmn_model <- final_glmn_model%>%
   fit(formula.reg, data = juice(final_rec))
 ```
 
 ```{r}
 #plot var importance
-vip(final_glmn_model,
+vip(fit_final_glmn_model,
     fill = "skyblue2")+
+  xlab ("Importance (coefficient magnitude)") +
   theme_classic() +
   theme(text = element_text(size = 15))
 ```
 
- - Being a professor and in discipline B have good prediction power of higher salary.
+ - Being a professor and in discipline B have good chance to predict higher salary
+ - Being an assistant professorl lead to lower salary
+ - Quadratic term of years of service has negative coefficient. Multicolinearity? 
 
 ---
-#Modeling: Residual analysis on test set
-```{r}
+#Modeling I: Residual analysis on test set
+```{r, fig.height=3.5}
 #preprocess the test set using the same recipe
 test_baked<-bake(final_rec,test)
 #plot residual
-test_prediction<-cbind(.pred=predict(final_glmn_model,new_data = test_baked),
+test_prediction<-cbind(.pred=predict(fit_final_glmn_model,new_data = test_baked),
                        salary=test_baked$salary)
 ggplot(test_prediction, aes(x = .pred, y = salary)) + 
   geom_abline(col = "skyblue2") + 
@@ -303,24 +314,30 @@ ggplot(test_prediction, aes(x = .pred, y = salary)) +
   xlab("Predicted value") +
   ylab("Salary") +
   theme_classic() +
-  theme(text = element_text(size = 15)) 
+  theme(text = element_text(size = 15))
 ```
 
- - The performance is better at lower side of the salary. It's harder to predict higher salary. 
-In a larger workflow, I will use this as a baseline and try a few more models (e.g. tree algorithms which are less sensitive to extreme values). Since this is a showcase example, I'll stop here. 
+```{r}
+test_prediction%>%rmse(truth=salary,
+                       estimate=.pred)
+```
+
+ - It's harder to predict higher salary well. 
+ - In a larger workflow, I will use this as a baseline and try a few more models (e.g. tree algorithms which are less sensitive to extreme values).
+ - Since this is a showcase example, I'll stop here. 
 
 ---
-#Modeling (binary classification)
- -
+#Modeling II: Preprocessing and modeling choice
+
 ```{r, echo=TRUE}
-dta <- dta %>% mutate(salary = (salary > median(dta$salary)) %>% as.numeric()%>% as.factor())
+dta <- dta %>% mutate(salary = (salary >= median(dta$salary)) %>% as.numeric()%>% as.factor())#ummy code the salary variable
 ```
 
 ```{r}
 table(dta$salary)
 ```
 
- - Same train/test split
+ - No need for resampling since the response variable is quite balanced
  
 ```{r}
 set.seed(1)
@@ -332,7 +349,7 @@ test  <- testing(dta_split)
 vfold <- vfold_cv(train, v = 5)
 ```
 
- - Same preprocessing steps
+ - Same train/test split and preprocessing steps
 
 ```{r}
 #modeling framework
@@ -343,13 +360,10 @@ salary_rec <- recipe(formula.reg,
   step_dummy(all_nominal(),-all_outcomes()) %>%
   step_poly(yrs.service, degree = 2)  %>%
   step_normalize(all_predictors(),-all_nominal())
-
-salary_rec
 ```
 
---- 
-
- - For classification I usually start with logistic regressions as baseline, but since we used glmnet already, let's do a CART instead.
+ - For classification I usually start with logistic regressions as baseline
+ - Since we used glmnet already, let's do a CART instead.
  
 ```{r}
 #define glmn model
@@ -361,9 +375,10 @@ cart_model
 ```
 
 ---
-#Modeling: Tuning the best model
+#Modeling II: Tuning the best model
 
- - We use a simple grid search for mixture and penalty with 10 levels for each.
+ - We use a random grid search for cost complexity and minimum points in a node with 10 levels for each (to save time).
+ - Use accuracy as the evaluation metric since we don't have a particular weight among 0/1 label
  
 ```{r,results=FALSE}
 #define parameter grid
@@ -376,67 +391,60 @@ cart_reg_search <-
             resamples = vfold,
             grid = cart_grid,
             control = ctrl)
-show_best(cart_reg_search, metric = "roc_auc", maximize = FALSE)
+show_best(cart_reg_search, metric = "accuracy", maximize = FALSE)
 ```
  
- 
-```{r,fig.height=3.5}
-best_cart <-
-  select_best(cart_reg_search, metric = "roc_auc", maximize = FALSE)
-
-cart_pred <- collect_predictions(cart_reg_search)
-cart_pred %>% 
-  inner_join(best_cart) %>% 
-  mutate(salary=salary%>%as.factor(),
-         .pred_class=.pred_class%>%as.numeric()) %>%
-  group_by(id) %>% 
-  roc_curve(salary, .pred_class) %>% 
-  autoplot()
-```
-
  - The best model:
-
 ```{r}
+best_cart <-
+  select_best(cart_reg_search, metric = "accuracy", maximize = FALSE)
 #inspect the best coefficient
 best_cart
 ```
- - The penalty and mixture are relatively small, showing that most variables have good prediction power
+
+ - The n_min is small since our sample size is not big. 
 
 ---
-#Modeling: Variable importance
+#Modeling: Performance on test set
+
 ```{r}
 #finalize the recipe
 final_rec <- salary_rec %>% prep()
 #finalize the best trained glmn model
 final_cart_model <-
   cart_model %>%
-  finalize_model(best_cart) %>%
+  finalize_model(best_cart) 
+fit_final_cart_model <- final_cart_model%>%
   fit(formula.reg, data = juice(final_rec))
 ```
 
-```{r}
-#plot var importance
-vip(final_cart_model,
-    fill = "skyblue2")+
-  theme_classic() +
-  theme(text = element_text(size = 15))
-```
-
- - Being a professor and in discipline B have good prediction power of higher salary.
-
----
-#Modeling: Residual analysis on test set
-```{r}
+```{r, fig.height=4}
 #preprocess the test set using the same recipe
 test_baked <- bake(final_rec, test)
 #plot residual
 test_prediction <-
   cbind(
-    .pred_class = predict(final_cart_model, new_data = test_baked),
+    .pred_class = predict(fit_final_cart_model, new_data = test_baked),
     salary = test_baked$salary
-  ) %>% mutate(.pred_class = .pred_class %>% as.numeric())
-test_prediction %>%
-  roc_curve(salary, .pred_class) %>%
-  autoplot()
+  ) %>% mutate(.pred_class = .pred_class %>% as.factor())
+conf_mat_test<-conf_mat(test_prediction,
+         truth = salary,
+         estimate = .pred_class)
+autoplot(conf_mat_test, type = "heatmap")+
+  theme_classic() +
+  theme(text = element_text(size = 15))
 ```
+
+```{r}
+test_prediction %>% accuracy(truth = salary,
+                             estimate = .pred_class)
+```
+
+ - The performance has quite a balance between FN and FP.
+ - However, CART model did worse on the test set which means it overfits. Next step would be to use bagged trees such as RF or GBM to reduce overfitting. 
  
+---
+#Data Set Enhancement: 3 further questions
+
+
+

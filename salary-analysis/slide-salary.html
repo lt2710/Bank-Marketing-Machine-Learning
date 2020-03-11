@@ -93,14 +93,13 @@ background-position: 50% 280%
 # Analysis
 (3) What is the distribution of salary by rank and discipline?
 &lt;img src="slide-salary_files/figure-html/unnamed-chunk-6-1.png" style="display: block; margin: auto;" /&gt;
- - We can see higher tank is associated with higher salary. Discipline B enjoys more than A. 
+ - We can see higher tank and discipline B (compared with A)is associated with higher salary.
 
 (4) How would you recode discipline as a 0/1 binary indicator?
 
 
 ```r
-#a typical way to dummy code to avoid redundancy/collinearity
-discipline_B&lt;-(dta$discipline=="B")%&gt;%as.numeric()#will use dplyr::mutate if manipulating a dataframe
+discipline_B&lt;-(dta$discipline=="B")%&gt;%as.numeric()#dummy code it to avoid redundancy/collinearity. will use dplyr::mutate if manipulating a dataframe
 ```
 
 
@@ -123,10 +122,10 @@ exclude: true
 ## salary               salary    &lt;int&gt; 397         0             0.0
 ```
 ---
-#Modeling: Data preparation
+#Modeling I: Data preparation
 
- - There is no unique id column so we assume there's no duplicates. 
- - The data is complete with no need for missing value imputations
+ - Assume no duplicates due to no unique id column
+ - No need for missing value imputations as the data is complete
  - Years since phd and years of service is strongly correlated.
 
 ```
@@ -142,21 +141,27 @@ exclude: true
 ##       cor 
 ## 0.9096491
 ```
- - We manually construct a variable measuring gap between year of phd graduation and year starting service
- 
+
 
 ```r
-dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)%&gt;%select(-yrs.since.phd)
+dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)#manually construct a variable measuring gap between year of phd graduation and year starting service
 ```
+
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   -11.0     1.0     3.0     4.7     7.0    30.0
+```
+
 ---
-#Modeling: Train/test split
+#Modeling I: Preprocessing
 
- - We don't have many records, so use 80% records to train data 
- - For hyperparameter tuning, we use 5-fold CV inside the training set
- 
+ - Use 80% records to train data since we don't have a big sample
+ - Apply 5-fold CV inside the training set for hyperparameter tuning (to make things faster)
+ - The preprocessing steps (recipe object in tidymodels framework):
 
 
- - The preprocessing steps:
+
 
 ```
 ## Data Recipe
@@ -171,15 +176,17 @@ dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)%&gt;%select(-yrs.since.ph
 ## 
 ## Log transformation on all_outcomes
 ## Factor variables from all_nominal, -, all_outcomes()
-## Dummy variables from all_nominal
+## Dummy variables from all_nominal, -, all_outcomes()
 ## Orthogonal polynomials on yrs.service
 ## Centering and scaling for all_predictors, -, all_nominal()
 ```
 
 ---
-#Modeling: Tidymodels framework
+#Modeling I: Modeling choice
 
- - Start with a penalized regression as baseline. Quick and interpratable. 
+ - Start with a general penalized regression as baseline. 
+ - It's quick, interpratable, and can usually serve as variable selection for subsequent modeling. 
+ - The model definition:
  
 
 ```
@@ -193,14 +200,15 @@ dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)%&gt;%select(-yrs.since.ph
 ```
 
 ---
-#Modeling: Tuning the best model
+#Modeling I: Tuning the best model
 
- - We use a random grid search for mixture and penalty with 10 levels for each.
+ - We use a random grid searching 10 levels for each of mixture and penalty
+ - We use RMSE as the metric to evaluate performance to give a relatively high weight to large errors since it's usually difficulty to predict them in salary
  
 
  
  
-&lt;img src="slide-salary_files/figure-html/unnamed-chunk-16-1.png" style="display: block; margin: auto;" /&gt;
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-17-1.png" style="display: block; margin: auto;" /&gt;
 
  - The best model:
 
@@ -214,40 +222,51 @@ dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)%&gt;%select(-yrs.since.ph
  - The penalty and mixture are relatively small, showing that most variables have good prediction power
 
 ---
-#Modeling: Variable importance
+#Modeling I: Variable importance
 
 
-&lt;img src="slide-salary_files/figure-html/unnamed-chunk-19-1.png" style="display: block; margin: auto;" /&gt;
-
- - Being a professor and in discipline B have good prediction power of higher salary.
-
----
-#Modeling: Residual analysis on test set
 &lt;img src="slide-salary_files/figure-html/unnamed-chunk-20-1.png" style="display: block; margin: auto;" /&gt;
 
- - The performance is better at lower side of the salary. It's harder to predict higher salary. 
-In a larger workflow, I will use this as a baseline and try a few more models (e.g. tree algorithms which are less sensitive to extreme values). Since this is a showcase example, I'll stop here. 
+ - Being a professor and in discipline B have good chance to predict higher salary
+ - Being an assistant professorl lead to lower salary
+ - Quadratic term of years of service has negative coefficient. Multicolinearity? 
 
 ---
-#Modeling (binary classification)
- -
+#Modeling I: Residual analysis on test set
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-21-1.png" style="display: block; margin: auto;" /&gt;
+
+
+```
+## # A tibble: 1 x 3
+##   .metric .estimator .estimate
+##   &lt;chr&gt;   &lt;chr&gt;          &lt;dbl&gt;
+## 1 rmse    standard      0.0767
+```
+
+ - It's harder to predict higher salary well. 
+ - In a larger workflow, I will use this as a baseline and try a few more models (e.g. tree algorithms which are less sensitive to extreme values).
+ - Since this is a showcase example, I'll stop here. 
+
+---
+#Modeling II: Preprocessing
+
 
 ```r
-dta &lt;- dta %&gt;% mutate(salary = (salary &gt; median(dta$salary)) %&gt;% as.numeric()%&gt;% as.factor())
+dta &lt;- dta %&gt;% mutate(salary = (salary &gt;= median(dta$salary)) %&gt;% as.numeric()%&gt;% as.factor())#ummy code the salary variable
 ```
 
 
 ```
 ## 
 ##   0   1 
-## 199 198
+## 198 199
 ```
 
- - Same train/test split
+ - No need for resampling since the response variable is quite balanced
  
 
 
- - Same preprocessing steps
+ - Same train/test split and preprocessing steps
 
 
 ```
@@ -267,9 +286,11 @@ dta &lt;- dta %&gt;% mutate(salary = (salary &gt; median(dta$salary)) %&gt;% as.
 ## Centering and scaling for all_predictors, -, all_nominal()
 ```
 
---- 
 
- - For classification I usually start with logistic regressions as baseline, but since we used glmnet already, let's do a CART instead.
+--- 
+#Modeling II: Model choice
+ - For classification I usually start with logistic regressions as baseline
+ - Since we used glmnet already, let's do a CART instead.
  
 
 ```
@@ -283,17 +304,14 @@ dta &lt;- dta %&gt;% mutate(salary = (salary &gt; median(dta$salary)) %&gt;% as.
 ```
 
 ---
-#Modeling: Tuning the best model
+#Modeling II: Tuning the best model
 
- - We use a simple grid search for mixture and penalty with 10 levels for each.
+ - We use a random grid search for cost complexity and minimum points in a node with 10 levels for each (to save time).
+ - Use accuracy as the evaluation metric since we don't have a particular weight among 0/1 label
  
 
  
- 
-&lt;img src="slide-salary_files/figure-html/unnamed-chunk-27-1.png" style="display: block; margin: auto;" /&gt;
-
  - The best model:
-
 
 ```
 ## # A tibble: 1 x 2
@@ -301,19 +319,26 @@ dta &lt;- dta %&gt;% mutate(salary = (salary &gt; median(dta$salary)) %&gt;% as.
 ##             &lt;dbl&gt; &lt;int&gt;
 ## 1    0.0000000001     2
 ```
- - The penalty and mixture are relatively small, showing that most variables have good prediction power
+
+ - The n_min is small since our sample size is not big. 
 
 ---
-#Modeling: Variable importance
+#Modeling: Performance on test set
 
 
-&lt;img src="slide-salary_files/figure-html/unnamed-chunk-30-1.png" style="display: block; margin: auto;" /&gt;
 
- - Being a professor and in discipline B have good prediction power of higher salary.
-
----
-#Modeling: Residual analysis on test set
 &lt;img src="slide-salary_files/figure-html/unnamed-chunk-31-1.png" style="display: block; margin: auto;" /&gt;
+
+
+```
+## # A tibble: 1 x 3
+##   .metric  .estimator .estimate
+##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
+## 1 accuracy binary         0.671
+```
+
+ - The performance has quite a balance between FN and FP.
+ - However, CART model did worse on the test set which means it overfits. Next step would be to use bagged trees such as RF or GBM to reduce overfitting.
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
