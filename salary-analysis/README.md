@@ -12,7 +12,7 @@ In addition, feel free to check [RMD](https://github.com/lt2710/Pet-projects/blo
 ### Modeling:
  - Salary (logged): a general penalized regression achieving 0.08 RMSE on test set.
  - Binary salary indicator: a CART achieving 0.67 accuracy on test set.
-###Enhancement:
+### Enhancement:
  - Questions: causal relationship between gender and salary, interaction salary effect of gender on seniority, subgroup detection
  - Additional attributes: citations, PhD at top schools, current academic instition rank, working hours, marriage status
  - Sample: size >=45, oversampling high salary observations
