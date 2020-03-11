@@ -304,7 +304,7 @@ dta &lt;- dta %&gt;% mutate(salary = (salary &gt;= median(dta$salary)) %&gt;% as
  - The n_min is small since our sample size is not big. 
 
 ---
-#Modeling: Performance on test set
+#Modeling II: Performance on test set
 
 
 
@@ -387,7 +387,13 @@ Therefore, the minimum sample size is v+u+1=45. We are well beyond this threhold
 
 ---
 #Data Set Enhancement: Sampling design
-However, it's also important to obtain a good estimate of population from the sample, which requires a representative sampling design.
+However, it's also important to obtain a good estimate of population from the sample, which requires a representative sampling design. 
+
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-34-1.png" style="display: block; margin: auto;" /&gt;
+
+Since most records are in the low to medium tier of the income, it would be the best if we can oversample the high salary group (e.g.&gt;150,000) with techniques such as stratified sampling. Having more records in that group will help to form better estimates.
+
+The case study ends here. Thank you very much for taking the time to read!
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>

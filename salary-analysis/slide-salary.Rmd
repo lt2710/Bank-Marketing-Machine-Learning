@@ -94,6 +94,13 @@ dta <- read.csv("Salaries.csv",
 ```{r}
 #print a summary
 summary(dta)
+salary_plot <- ggplot(dta %>% mutate(salary = salary),
+                      aes(x = salary)) +
+  geom_histogram(fill = "skyblue2") +
+  xlab("") +
+  ylab("") +
+  theme_classic() +
+  theme(text = element_text(size = 15))
 ```
 
 ---
@@ -498,3 +505,12 @@ Therefore, the minimum sample size is v+u+1=45. We are well beyond this threhold
 ---
 #Data Set Enhancement: Sampling design
 However, it's also important to obtain a good estimate of population from the sample, which requires a representative sampling design. 
+
+```{r,fig.height=3.5}
+salary_plot
+```
+
+Since most records are in the low to medium tier of the income, it would be the best if we can oversample the high salary group (e.g.>150,000) with techniques such as stratified sampling. Having more records in that group will help to form better estimates.
+
+The case study ends here. Thank you very much for taking the time to read! 
+
