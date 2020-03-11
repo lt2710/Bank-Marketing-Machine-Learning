@@ -23,7 +23,6 @@ background-size: 100%
 background-position: 50% 280%
 
 
-## Setup
 ```{r setup, include=FALSE}
 rm(list = ls())#clear environment
 wd <- "~/GitHub/Pet-projects/vote-analysis/"#set working directory
@@ -40,12 +39,10 @@ knitr::opts_chunk$set(
   cache = TRUE,
   cache.lazy = FALSE
 )
-#knitr::opts_knit$set(root.dir = "C:/Users/Tianl/Documents/GitHub/Bank-Marketing-Machine-Learning/Census")
 options(htmltools.dir.version = FALSE)
 ```  
 
 ```{r theme-map, include=FALSE}
-#set up theme map
 theme_simplemap <- function(base_size = 9,
                             base_family = "") {
   theme_bw(base_size = base_size, base_family = base_family) %+replace%
@@ -104,9 +101,27 @@ salary_plot <- ggplot(dta %>% mutate(salary = salary),
 ```
 
 ---
+# Summary
+Data preparation:
+ - No dedup/imputation performed
+ - Construct new feature to avoid multicolinearity between yrs.since.phd and yrs.service
+ - 8:2 train/test split, 5-fold CV inside the training set for hyperparameter tuning
+ - Dummy code all factors; Add 2nd order polynomials on yrs.service; Normalize numeric features
+
+Modeling:
+ - Salary (logged): a general penalized regression achieving 0.08 RMSE on test set.
+ - Binary salary indicator: a CART achieving 0.67 accuracy on test set.
+
+Enhancement: 
+ - Questions: causal relationship between gender and salary, interaction salary effect of gender on seniority, subgroup detection
+ - Additional attributes: citations, PhD at top schools, current academic instition rank, working hours, marriage status
+ - Sample: size >=45, oversampling high salary observations
+
+---
 # Analysis
 (1) What percentage of records are Assistant Professors with less than 5 years of experience?
 ```{r}
+#print an answer to the question 1
 cat((nrow(dta%>%filter(rank=="AsstProf",yrs.service<5))*100/nrow(dta))%>%round(2),
     "% of records are Assistant Professors with less than 5 years of experience.",
     sep = "")
@@ -118,12 +133,14 @@ cat((nrow(dta%>%filter(rank=="AsstProf",yrs.service<5))*100/nrow(dta))%>%round(2
 
 .pull-left[
 ```{r}
+#view gender difference in salary
 dta%>%group_by(sex)%>%summarise(mean(salary))
 ```
 ]
 
 .pull-right[
 ```{r}
+#perform wilcoxon test
 wilcox.test(salary~sex,data = dta)
 ```
 ]
@@ -134,6 +151,7 @@ wilcox.test(salary~sex,data = dta)
 # Analysis
 (3) What is the distribution of salary by rank and discipline?
 ```{r,fig.height=3.5}
+#ggplot2 framwork
 rank_plot <- ggplot(dta,
                     aes(x = rank %>% reorder(dta$salary),
                         y = salary)) +
@@ -142,6 +160,7 @@ discipline_plot <- ggplot(dta,
                           aes(x = discipline %>% reorder(dta$salary),
                               y = salary)) +
   geom_boxplot(fill = "skyblue2")
+#a function to make the plots more pretty
 plot_pretty <- function(plot) {
   pretty_plot <- plot + 
     xlab("") +
@@ -150,12 +169,12 @@ plot_pretty <- function(plot) {
     theme(text = element_text(size = 15)) 
   return(pretty_plot)
 }
-
+#integrate the two plots
 grid.arrange(plot_pretty(rank_plot),
              plot_pretty(discipline_plot),
              nrow = 1)
 ```
- - We can see higher tank and discipline B (compared with A)is associated with higher salary.
+ - We can see higher tank and discipline B (compared with A) is associated with higher salary.
 
 (4) How would you recode discipline as a 0/1 binary indicator?
 
@@ -180,6 +199,7 @@ missing_glimpse(dta)
  - No need for missing value imputations as the data is complete
  - Years since phd and years of service is strongly correlated.
 ```{r}
+#test correlation between years of service and years since phd
 cor.test(dta$yrs.since.phd, dta$yrs.service, method="pearson")
 ```
 
@@ -188,6 +208,7 @@ dta<-dta%>%mutate(gap=yrs.since.phd-yrs.service)#manually construct a variable m
 ```
 
 ```{r}
+#view summary
 dta<-dta%>%select(-yrs.since.phd)
 summary(dta$gap)
 ```
@@ -259,6 +280,7 @@ show_best(glmn_reg_search, metric = "rmse", maximize = FALSE)
  
  
 ```{r,fig.height=3.5}
+#visualize CVed performance on parameter grids
 rmse_vals <- collect_metrics(glmn_reg_search) %>% filter(.metric == "rmse")
 rmse_vals %>% 
   mutate(mixture = format(mixture)) %>% 
@@ -325,6 +347,7 @@ ggplot(test_prediction, aes(x = .pred, y = salary)) +
 ```
 
 ```{r}
+#calculate RMSE on test set
 test_prediction%>%rmse(truth=salary,
                        estimate=.pred)
 ```
@@ -341,6 +364,7 @@ dta <- dta %>% mutate(salary = (salary >= median(dta$salary)) %>% as.numeric()%>
 ```
 
 ```{r}
+#inspect salary indicator
 table(dta$salary)
 ```
 
@@ -443,6 +467,7 @@ autoplot(conf_mat_test, type = "heatmap")+
 ```
 
 ```{r}
+#calculate accuracy on test set
 test_prediction %>% accuracy(truth = salary,
                              estimate = .pred_class)
 ```
@@ -507,10 +532,10 @@ Therefore, the minimum sample size is v+u+1=45. We are well beyond this threhold
 However, it's also important to obtain a good estimate of population from the sample, which requires a representative sampling design. 
 
 ```{r,fig.height=3.5}
-salary_plot
+salary_plot#pull up y plot again
 ```
 
 Since most records are in the low to medium tier of the income, it would be the best if we can oversample the high salary group (e.g.>150,000) with techniques such as stratified sampling. Having more records in that group will help to form better estimates.
 
 The case study ends here. Thank you very much for taking the time to read! 
-
+ 
