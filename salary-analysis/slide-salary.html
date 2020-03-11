@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Predicting academic job salary</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Langyi Tian" />
+    <link rel="stylesheet" href="mtheme_max.css" type="text/css" />
+    <link rel="stylesheet" href="fonts_mtheme_max.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Predicting academic job salary
+### Langyi Tian
+### March 2020
+
+---
+
+exclude: true
+
+class: left, top
+background-image: url(images/roadmap.png)
+background-size: 100%
+background-position: 50% 280%
+
+
+## Setup
+
+
+
+
+
+
+
+
+
+```
+##      rank            discipline        yrs.since.phd    yrs.service   
+##  Length:397         Length:397         Min.   : 1.00   Min.   : 0.00  
+##  Class :character   Class :character   1st Qu.:12.00   1st Qu.: 7.00  
+##  Mode  :character   Mode  :character   Median :21.00   Median :16.00  
+##                                        Mean   :22.31   Mean   :17.61  
+##                                        3rd Qu.:32.00   3rd Qu.:27.00  
+##                                        Max.   :56.00   Max.   :60.00  
+##      sex                salary      
+##  Length:397         Min.   : 57800  
+##  Class :character   1st Qu.: 91000  
+##  Mode  :character   Median :107300  
+##                     Mean   :113706  
+##                     3rd Qu.:134185  
+##                     Max.   :231545
+```
+
+---
+# Analysis
+(1) What percentage of records are Assistant Professors with less than 5 years of experience?
+
+```
+## 15.87% of records are Assistant Professors with less than 5 years of experience.
+```
+
+(2) Is there a statistically significant difference between female and male salaries?
+
+ - Here we want to test the salary against two sex categories. Salary data does not follow a normal distribution in our sample, so we adopt the 2-sample Wilcoxon test. 
+
+.pull-left[
+
+```
+## # A tibble: 2 x 2
+##   sex    `mean(salary)`
+##   &lt;chr&gt;           &lt;dbl&gt;
+## 1 Female        101002.
+## 2 Male          115090.
+```
+]
+
+.pull-right[
+
+```
+## 
+## 	Wilcoxon rank sum test with continuity correction
+## 
+## data:  salary by sex
+## W = 5182.5, p-value = 0.008237
+## alternative hypothesis: true location shift is not equal to 0
+```
+]
+
+ - The p-value is smaller than 0.01, strongly against the null hypothesis that male and female holds equal salary. In other words, female and male salaries are significantly different. 
+
+---
+# Analysis
+(3) What is the distribution of salary by rank and discipline?
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-6-1.png" style="display: block; margin: auto;" /&gt;
+ - We can see higher tank is associated with higher salary. Discipline B enjoys more than A. 
+
+(4) How would you recode discipline as a 0/1 binary indicator?
+
+
+```r
+#a typical way to dummy code to avoid redundancy/collinearity
+discipline_B&lt;-(dta$discipline=="B")%&gt;%as.numeric()#will use dplyr::mutate if manipulating a dataframe
+```
+
+
+```
+## discipline_B
+##   0   1 
+## 181 216
+```
+
+---
+exclude: true
+
+```
+##                       label var_type   n missing_n missing_percent
+## rank                   rank    &lt;chr&gt; 397         0             0.0
+## discipline       discipline    &lt;chr&gt; 397         0             0.0
+## yrs.since.phd yrs.since.phd    &lt;int&gt; 397         0             0.0
+## yrs.service     yrs.service    &lt;int&gt; 397         0             0.0
+## sex                     sex    &lt;chr&gt; 397         0             0.0
+## salary               salary    &lt;int&gt; 397         0             0.0
+```
+---
+#Modeling: Data preparation
+
+ - There is no unique id column so we assume there's no duplicates. 
+ - The data is complete with no need for missing value imputations
+ - Years since phd and years of service is strongly correlated.
+
+```
+## 
+## 	Pearson's product-moment correlation
+## 
+## data:  dta$yrs.since.phd and dta$yrs.service
+## t = 43.524, df = 395, p-value &lt; 2.2e-16
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.8909977 0.9252353
+## sample estimates:
+##       cor 
+## 0.9096491
+```
+ - We manually construct a variable measuring gap between year of phd graduation and year starting service
+ 
+
+```r
+dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)%&gt;%select(-yrs.since.phd)
+```
+---
+#Modeling: Train/test split
+
+ - We don't have many records, so use 80% records to train data 
+ - For hyperparameter tuning, we use 5-fold CV inside the training set
+ 
+
+
+ - The preprocessing steps:
+
+```
+## Data Recipe
+## 
+## Inputs:
+## 
+##       role #variables
+##    outcome          1
+##  predictor          5
+## 
+## Operations:
+## 
+## Log transformation on all_outcomes
+## Factor variables from all_nominal, -, all_outcomes()
+## Dummy variables from all_nominal
+## Orthogonal polynomials on yrs.service
+## Centering and scaling for all_predictors, -, all_nominal()
+```
+
+---
+#Modeling: Tidymodels framework
+
+ - Start with a penalized regression as baseline. Quick and interpratable. 
+ 
+
+```
+## Linear Regression Model Specification (regression)
+## 
+## Main Arguments:
+##   penalty = tune()
+##   mixture = tune()
+## 
+## Computational engine: glmnet
+```
+
+---
+#Modeling: Tuning the best model
+
+ - We use a random grid search for mixture and penalty with 10 levels for each.
+ 
+
+ 
+ 
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-16-1.png" style="display: block; margin: auto;" /&gt;
+
+ - The best model:
+
+
+```
+## # A tibble: 1 x 2
+##   penalty mixture
+##     &lt;dbl&gt;   &lt;dbl&gt;
+## 1 0.00599   0.261
+```
+ - The penalty and mixture are relatively small, showing that most variables have good prediction power
+
+---
+#Modeling: Variable importance
+
+
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-19-1.png" style="display: block; margin: auto;" /&gt;
+
+ - Being a professor and in discipline B have good prediction power of higher salary.
+
+---
+#Modeling: Residual analysis on test set
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-20-1.png" style="display: block; margin: auto;" /&gt;
+
+ - The performance is better at lower side of the salary. It's harder to predict higher salary. 
+In a larger workflow, I will use this as a baseline and try a few more models (e.g. tree algorithms which are less sensitive to extreme values). Since this is a showcase example, I'll stop here. 
+
+---
+#Modeling (binary classification)
+ -
+
+```r
+dta &lt;- dta %&gt;% mutate(salary = (salary &gt; median(dta$salary)) %&gt;% as.numeric()%&gt;% as.factor())
+```
+
+
+```
+## 
+##   0   1 
+## 199 198
+```
+
+ - Same train/test split
+ 
+
+
+ - Same preprocessing steps
+
+
+```
+## Data Recipe
+## 
+## Inputs:
+## 
+##       role #variables
+##    outcome          1
+##  predictor          5
+## 
+## Operations:
+## 
+## Factor variables from all_nominal, -, all_outcomes()
+## Dummy variables from all_nominal, -, all_outcomes()
+## Orthogonal polynomials on yrs.service
+## Centering and scaling for all_predictors, -, all_nominal()
+```
+
+--- 
+
+ - For classification I usually start with logistic regressions as baseline, but since we used glmnet already, let's do a CART instead.
+ 
+
+```
+## Decision Tree Model Specification (classification)
+## 
+## Main Arguments:
+##   cost_complexity = tune()
+##   min_n = tune()
+## 
+## Computational engine: rpart
+```
+
+---
+#Modeling: Tuning the best model
+
+ - We use a simple grid search for mixture and penalty with 10 levels for each.
+ 
+
+ 
+ 
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-27-1.png" style="display: block; margin: auto;" /&gt;
+
+ - The best model:
+
+
+```
+## # A tibble: 1 x 2
+##   cost_complexity min_n
+##             &lt;dbl&gt; &lt;int&gt;
+## 1    0.0000000001     2
+```
+ - The penalty and mixture are relatively small, showing that most variables have good prediction power
+
+---
+#Modeling: Variable importance
+
+
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-30-1.png" style="display: block; margin: auto;" /&gt;
+
+ - Being a professor and in discipline B have good prediction power of higher salary.
+
+---
+#Modeling: Residual analysis on test set
+&lt;img src="slide-salary_files/figure-html/unnamed-chunk-31-1.png" style="display: block; margin: auto;" /&gt;
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightStyle": "github",
+"highlightLines": true
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
