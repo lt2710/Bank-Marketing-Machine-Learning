@@ -248,11 +248,11 @@ dta&lt;-dta%&gt;%mutate(gap=yrs.since.phd-yrs.service)#manually construct a vari
  - Since this is a showcase example, I'll stop here. 
 
 ---
-#Modeling II: Preprocessing
+#Modeling II: Preprocessing and modeling choice
 
 
 ```r
-dta &lt;- dta %&gt;% mutate(salary = (salary &gt;= median(dta$salary)) %&gt;% as.numeric()%&gt;% as.factor())#ummy code the salary variable
+dta &lt;- dta %&gt;% mutate(salary = (salary &gt;= median(dta$salary)) %&gt;% as.numeric()%&gt;% as.factor())#Dummy code the salary variable
 ```
 
 
@@ -269,26 +269,7 @@ dta &lt;- dta %&gt;% mutate(salary = (salary &gt;= median(dta$salary)) %&gt;% as
  - Same train/test split and preprocessing steps
 
 
-```
-## Data Recipe
-## 
-## Inputs:
-## 
-##       role #variables
-##    outcome          1
-##  predictor          5
-## 
-## Operations:
-## 
-## Factor variables from all_nominal, -, all_outcomes()
-## Dummy variables from all_nominal, -, all_outcomes()
-## Orthogonal polynomials on yrs.service
-## Centering and scaling for all_predictors, -, all_nominal()
-```
 
-
---- 
-#Modeling II: Model choice
  - For classification I usually start with logistic regressions as baseline
  - Since we used glmnet already, let's do a CART instead.
  
@@ -338,7 +319,41 @@ dta &lt;- dta %&gt;% mutate(salary = (salary &gt;= median(dta$salary)) %&gt;% as
 ```
 
  - The performance has quite a balance between FN and FP.
- - However, CART model did worse on the test set which means it overfits. Next step would be to use bagged trees such as RF or GBM to reduce overfitting.
+ - However, CART model did worse on the test set which means it overfits. Next step would be to use bagged trees such as RF or GBM to reduce overfitting. 
+ 
+---
+#Data Set Enhancement: 3 further questions
+1. Is there a causal relationship between gender and salaries among PhDs?
+
+ - From the analysis part, we know that there's a significant salary gap among male and female. However, are female discriminated in the labor market due to their gender identity? In other words, is the gap induced by the gender identify itself rather than other difference (e.g. rank, discipline or seniority)? We can use a linear regression to observe the significance of the gender coefficient controlling other parameters. 
+
+2. Will gender identity influence the reward to seniority?
+
+ - The mechanism for gender identity to impact labor market rewards is complicated. In addition to pure discrimination described by the previous case, it's also possible that women with seniority will receive less reward than men with seniority, due to an invisible salary ceiling or inability to work very hard (e.g. family obligations so cannot publish a lot). In other words, there might be an interaction effect between sex and ys.service. 
+ 
+3. What are the subgroups in the academic population? 
+
+ - Rather than the male vs. female or B vs. A difference, can we adopt a more holistic way to observe subgroups in the PhDs, who share similarity in their demographics and academic profile? We can achieve this by applying a clustering algorithm to the data (e.g. K-means or K-medoid since the sample size is small and data is mixed). 
+ 
+---
+#Data Set Enhancement: 5 additional attributes
+As the previous questions targeted salary, it's better to have measurements of other the  eterminants of salary to avoid omitted variable bias.
+1. Number of publications/citations (e.g. 34 citations for SCI)
+ - More publications usually lead to faster promotion and higher salary. If we add it we can determine whether the gender salary gap can rise from the publication difference. Data might be obtained with tools such as Elsevier API if real names are given. 
+ 
+2. PhD at a top school (e.g. Yes)
+ - A degree from a top tier school such as Harvard always brings a premium, regardless of the curent place that someone teaches in, as another dimension of the academic profile. 
+ 
+3. Current academic institution rank (e.g. 102th on U.S. News)
+ - Teaching in a top tier university versus a community college brings huge difference in career prospect, and we want to put in as a confounding variable to avoid introducing bias in other estimates. 
+
+---
+#Data Set Enhancement: 5 additional attributes
+4. Weekly working hours (e.g. 30 hours)
+ - This is a potential proxy for the mechanism of gender gap. If female PhDs are only able to work fewer hours than male, then the significance of the coefficient for gender will likely dissapear after adding working hours. 
+ 
+5. Marriage status (e.g. Unmarried)
+ - For a similar reason, marriage might be a proxy for family obligations, since female usually have to spend more time at home after getting married. Adding that will be helpful to clarify the mechanism of gender influence.
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
