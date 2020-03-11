@@ -405,7 +405,7 @@ best_cart
  - The n_min is small since our sample size is not big. 
 
 ---
-#Modeling: Performance on test set
+#Modeling II: Performance on test set
 
 ```{r}
 #finalize the recipe
@@ -471,8 +471,30 @@ As the previous questions targeted salary, it's better to have measurements of o
 
 ---
 #Data Set Enhancement: 5 additional attributes
+
 4. Weekly working hours (e.g. 30 hours)
  - This is a potential proxy for the mechanism of gender gap. If female PhDs are only able to work fewer hours than male, then the significance of the coefficient for gender will likely dissapear after adding working hours. 
  
 5. Marriage status (e.g. Unmarried)
  - For a similar reason, marriage might be a proxy for family obligations, since female usually have to spend more time at home after getting married. Adding that will be helpful to clarify the mechanism of gender influence.
+
+---
+#Data Set Enhancement: Sample size
+
+We use a power analysis to calculate a minimum requirement for sample size. 
+
+```{r,echo=TRUE}
+library(pwr)
+pwr.f2.test(
+  u = 10,#10 independent variables (less intercept)
+  f2 = 0.5/(1-0.5),#Assume the R2 is 0.5
+  sig.level = 0.001,#Need 0.001 significance level 
+  power = 0.8#Assuming 0.8 power
+)
+```
+
+Therefore, the minimum sample size is v+u+1=45. We are well beyond this threhold.
+
+---
+#Data Set Enhancement: Sampling design
+However, it's also important to obtain a good estimate of population from the sample, which requires a representative sampling design. 
