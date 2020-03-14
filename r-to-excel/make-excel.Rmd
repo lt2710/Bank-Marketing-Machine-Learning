@@ -1,0 +1,146 @@
+---
+title: "R to Excel"
+author: "Langyi Tian"
+date: "March 2020"
+output: html_document 
+--- 
+
+## Setup
+```{r setup, include=FALSE}
+rm(list = ls())#clear environment
+wd <- "~/GitHub/Pet-projects/r-to-excel/"#set working directory
+#Set up default knitr chunk options
+library("knitr")
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE, 
+  cache = TRUE,
+  cache.lazy = FALSE
+) 
+```   
+
+```{r load packages}
+packages <- c(
+  "tidyverse",
+  "openxlsx",
+  "lubridate",
+  "finalfit"
+)
+packages <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+select<-dplyr::select
+```
+
+## Data exploration
+```{r}
+#import raw data
+addsToCart <- read.csv("addsToCart.csv",
+                  stringsAsFactors = FALSE)
+sessionCounts <- read.csv("sessionCounts.csv",
+                  stringsAsFactors = FALSE)
+```
+
+By a quick glance at the input and desired output, 
+1. The "Month * Device" sheet is a summary of metrics in sessionCounts data by month (date) and device. 
+2. Further summarizing the previous sheet, the "Month Summary" sheet is by month only, merged with addsToCart data.
+So the process would proceed timely according to the order.
+
+```{r}
+#print a summary
+summary(sessionCounts)
+```
+There might exist some anomalies (how come a device can have 43k sessions in a day?), but without subjective domain knowledge we'll keep them raw now.
+
+```{r}
+#check missing values
+missing_glimpse(sessionCounts)
+```
+No missing value imputation needed.
+
+```{r}
+#Engineer the month variable
+sessionCounts <-
+  sessionCounts %>% mutate(dim_month = month(dim_date %>% as.Date()))#round date to month
+sessionCounts$dim_month %>% summary()
+```
+
+## make the month device sheet
+```{r}
+#make the month device sheet
+month_device <-
+  sessionCounts %>% #take this data
+  group_by(Month = dim_month, `Device Category` = dim_deviceCategory) %>% #group by month and category
+  summarise(
+    Sessions = sum(sessions),
+    Transactions = sum(transactions),
+    QTY = sum(QTY),
+  ) %>% #compute summary statistics
+  mutate(ECR = Transactions / Sessions) %>% #compute ECR
+  arrange(Month, `Device Category`) # arrange by month then device
+
+month_device
+```
+
+## make the month summary sheet
+```{r}
+#modify names of addtocard data
+names(addsToCart)<-c("Month","Adds To Cart")
+
+#make the month summary sheet
+month_summary <-  month_device %>%
+  group_by(Month) %>% #group by month
+  summarize(
+    Sessions = sum(Sessions),
+    Transactions = sum(Transactions),
+    QTY = sum(QTY)
+  ) %>% #print summary stats
+  mutate(ECR = Transactions / Sessions,
+         `Device Category` = "Overall") %>% #compute metrics again
+  full_join(addsToCart, by = "Month") %>% #join with add to cart data
+  select(Month,
+         `Device Category`,
+         Sessions,
+         Transactions,
+         QTY,
+         `Adds To Cart`,
+         everything()) %>% #reorder variables
+  arrange(Month) #arrange by month
+month_summary
+```
+
+## create the excel dashboard
+```{r}
+#create a new wb
+wb <- createWorkbook()
+#create new sheets
+addWorksheet(wb, "Month x Device")
+addWorksheet(wb, "Month Summary")
+#write data into sheet
+writeData(wb, "Month x Device", month_device)
+writeData(wb, "Month Summary", month_summary)
+#create headline style
+hs <- createStyle(wrapText = TRUE,
+                  textDecoration = "BOLD", 
+                  border = "bottom",
+                  fgFill = "#E5E5E5")
+#add hs
+addStyle(wb,sheet = 1,hs,rows = 1, cols = 1:6)
+addStyle(wb,sheet = 2,hs,rows = 1, cols = 1:7)
+#set column width
+setColWidths(wb, sheet = 1, cols = 1:6, widths = 11)
+setColWidths(wb, sheet = 2, cols = 1:7, widths = 11)
+#not show grid lines
+showGridLines(wb, 1, showGridLines = FALSE)
+showGridLines(wb, 2, showGridLines = FALSE)
+#save workbook
+saveWorkbook(wb, "workbook-from-r.xlsx", overwrite = TRUE)
+```
