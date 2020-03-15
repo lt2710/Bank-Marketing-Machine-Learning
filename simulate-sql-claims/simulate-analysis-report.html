@@ -373,8 +373,10 @@ summary {
 <h2>Setup</h2>
 <pre class="r"><code>packages &lt;- c(
   &quot;tidyverse&quot;,
+  &quot;DBI&quot;,
   &quot;RSQLite&quot;,
-  &quot;randomNames&quot;
+  &quot;randomNames&quot;,
+  &quot;lubridate&quot;
 )
 packages &lt;- lapply(
   packages,
@@ -387,14 +389,15 @@ packages &lt;- lapply(
 )
 select&lt;-dplyr::select</code></pre>
 </div>
-<div id="data-exploration" class="section level2">
-<h2>Data exploration</h2>
+<div id="simulate-data-in-a-sqlite-instance" class="section level2">
+<h2>Simulate data in a SQLite instance</h2>
 <pre class="r"><code># create a SQLite instance and create one connection.
 m &lt;- dbDriver(&#39;SQLite&#39;)
 # initialize a new database to a tempfile
 tfile &lt;- tempfile()
 con &lt;- dbConnect(m, dbname=tfile)</code></pre>
-<pre class="r"><code>#patient data
+<pre class="r"><code>set.seed(1)
+#patient data
 patient_id &lt;- c(1:1000)
 Name &lt;- randomNames(1000)
 Birthdate &lt;-
@@ -424,7 +427,8 @@ Diagnosis &lt;- data.frame(diagnosis_ID,
 dbWriteTable(con, &#39;patient&#39;, patient)
 dbWriteTable(con, &#39;Encounter&#39;, Encounter)
 dbWriteTable(con, &#39;Diagnosis&#39;, Diagnosis)</code></pre>
-<pre class="sql"><code>/*The number of inpatient admissions per patient_id*/ 
+<p>##Solve two challenges in SQL</p>
+<pre class="sql"><code>/*The number of inpatient admissions per patient_id for all patients between the ages of 18 and 64 who have an ICD-9 diagnosis code 290 - 319, and have an inpatient admission between 1/1/2017 and 12/31/2017.  */ 
 SELECT SUM(QualifiedAdmissions)*0.1/(COUNT(patient_id)*0.1) AS AverageQualifiedAdmission/*count the encounters of...*/
 FROM
   (SELECT patient_id,
@@ -465,7 +469,7 @@ FROM
 </thead>
 <tbody>
 <tr class="odd">
-<td align="left">1.18452380952381</td>
+<td align="left">1.23214285714286</td>
 </tr>
 </tbody>
 </table>
@@ -503,8 +507,8 @@ FROM /*an encounter-id based data joining the three datasets*/ (
                                                                           *
                                                                    FROM Encounter) AS e USING (patient_id)
                                                                 JOIN
-                                                                  (SELECT SUM (bipolar) AS bipolarSum,/*sum of bipolar*/
-                                                                              SUM (schizophrenia) AS schizophreniaSum,/*sum of schizophreniaSum*/
+                                                                  (SELECT SUM (bipolar) AS bipolarSum,/*sum of bipolar in a given encounter*/
+                                                                              SUM (schizophrenia) AS schizophreniaSum,/*sum of schizophreniaSum in a given encounter*/
                                                                                   *
                                                                    FROM /*diagnosis data*/
                                                                      (SELECT CASE
@@ -539,90 +543,90 @@ ORDER BY patient_id </code></pre>
 <tbody>
 <tr class="odd">
 <td align="left">1</td>
-<td align="left">Salazar, Eric</td>
-<td align="right">0</td>
+<td align="left">Martinez, Brian</td>
 <td align="right">1</td>
+<td align="right">0</td>
 <td align="right">0</td>
 <td align="right">0</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="left">2</td>
-<td align="left">Torres, Victor</td>
-<td align="right">3</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
+<td align="left">Aguirre, Mary</td>
 <td align="right">1</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="left">3</td>
-<td align="left">Hamlin, Zoe</td>
+<td align="left">Loomis-Dotson, Daniel</td>
 <td align="right">0</td>
 <td align="right">1</td>
 <td align="right">0</td>
 <td align="right">0</td>
-<td align="right">1</td>
+<td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="left">4</td>
-<td align="left">Joel, Elizabeth</td>
-<td align="right">1</td>
+<td align="left">Warner, Cameron</td>
 <td align="right">0</td>
 <td align="right">0</td>
+<td align="right">2</td>
 <td align="right">0</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="left">5</td>
-<td align="left">el-Masri, Salmaan</td>
+<td align="left">Dixon, Aisha</td>
+<td align="right">0</td>
+<td align="right">0</td>
 <td align="right">1</td>
-<td align="right">2</td>
 <td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
+<td align="right">1</td>
 </tr>
 <tr class="even">
 <td align="left">6</td>
-<td align="left">Reaves, Dylan</td>
-<td align="right">1</td>
+<td align="left">Schau, Drew</td>
 <td align="right">1</td>
 <td align="right">0</td>
+<td align="right">2</td>
 <td align="right">0</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="left">7</td>
-<td align="left">Miner, Jill</td>
-<td align="right">0</td>
-<td align="right">0</td>
+<td align="left">Chen, Joshua</td>
 <td align="right">2</td>
-<td align="right">0</td>
-<td align="right">0</td>
-</tr>
-<tr class="even">
-<td align="left">8</td>
-<td align="left">Brown, Cody</td>
 <td align="right">1</td>
 <td align="right">0</td>
 <td align="right">0</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td align="left">8</td>
+<td align="left">Bartels, Kyndall</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">2</td>
 <td align="right">0</td>
 <td align="right">0</td>
 </tr>
 <tr class="odd">
 <td align="left">9</td>
-<td align="left">Brott, Angelic</td>
+<td align="left">Loya, Monica</td>
+<td align="right">1</td>
+<td align="right">1</td>
 <td align="right">0</td>
-<td align="right">0</td>
-<td align="right">2</td>
 <td align="right">0</td>
 <td align="right">0</td>
 </tr>
 <tr class="even">
 <td align="left">10</td>
-<td align="left">Schneider, Michael</td>
-<td align="right">2</td>
+<td align="left">al-Ahmad, Salma</td>
 <td align="right">1</td>
+<td align="right">0</td>
 <td align="right">0</td>
 <td align="right">0</td>
 <td align="right">0</td>
@@ -630,10 +634,88 @@ ORDER BY patient_id </code></pre>
 </tbody>
 </table>
 </div>
-<pre class="r"><code># clean up
+</div>
+<div id="solve-two-challenges-in-r" class="section level2">
+<h2>Solve two challenges in R</h2>
+<p>Since I’m doing the simulation in R, I’ll just use it for this challenge. However, I also use Stata and I will put a small Stata programming file in the portfolio.</p>
+<pre class="r"><code>#R codes follow the same analytical process as to the SQL code. I use tidyverse mainly. 
+#patient data with qualified ages
+patient_qualified &lt;-
+  patient %&gt;% mutate(Age = interval(ymd(Birthdate), ymd(&quot;2020-03-14&quot;)) %&gt;%
+                       time_length(&quot;year&quot;) %&gt;% 
+                       round(0)) %&gt;% 
+                       filter(Age&gt;=18,
+                              Age&lt;=64)
+#encounter data with qualified date and service type
+encounter_qualified &lt;-
+  Encounter %&gt;% filter(service_date%&gt;%as.Date()&gt;=&quot;2017-01-01&quot;,
+                       service_date%&gt;%as.Date()&lt;=&quot;2017-12-31&quot;,
+                       service_type%in%c(&quot;inpatient&quot;))
+#encounter-based diagnosis data with qualified diagnosis code
+diagnose_qualified &lt;-
+  Diagnosis %&gt;% 
+  mutate(qualified_code=(Icd9_code&gt;=290 &amp; Icd9_code&lt;=319)) %&gt;%
+  group_by(encounter_id) %&gt;%
+  summarise(Num_PositiveICD9_Diagnosis = sum(qualified_code))
+#join all data
+encounter_qualified_joined&lt;- patient_qualified %&gt;% 
+  inner_join(encounter_qualified, by = &quot;patient_id&quot;) %&gt;%
+  inner_join(diagnose_qualified, by = &quot;encounter_id&quot;) %&gt;%
+  group_by(patient_id) %&gt;%
+  summarise(QualifiedAdmissions = n())
+
+sum(encounter_qualified_joined$QualifiedAdmissions)/nrow(encounter_qualified_joined)</code></pre>
+<pre><code>## [1] 1.230769</code></pre>
+<pre class="r"><code>#There is minor difference between the SQL and R output (2 out of 3000 cases after manual check). If an actual project requires we can output the final dataset in SQL and R to reverse engineer the difference of codes that lead to that</code></pre>
+<pre class="r"><code>#make flags in encounter data
+encounter_flagged &lt;- Encounter %&gt;% 
+  mutate(inpatient = service_type %in% c(&quot;inpatient&quot;),
+         outpatient = service_type %in% c(&quot;outpatient&quot;),
+         ED = service_type %in% c(&quot;ED&quot;))
+#make flags in diagnosis
+diagnosis_flagged &lt;- Diagnosis %&gt;% 
+  mutate(schizophrenia = Icd9_code %in% c(295.00, 295.01, 295.02, 295.03, 295.04, 295.05, 295.10, 295.11, 295.12, 295.13, 295.14, 295.15, 295.20, 295.21, 295.22, 295.23, 295.24, 295.25, 295.30, 295.31, 295.32, 295.33, 295.34, 295.35, 295.40, 295.41, 295.42, 295.43, 295.44, 295.45, 295.50, 295.51,295.52, 295.53, 295.54, 295.55, 295.60, 295.61, 295.62, 295.63,295.64, 295.65, 295.70, 295.71, 295.72, 295.73, 295.74, 295.75,
+295.80, 295.81, 295.82, 295.83, 295.84, 295.85, 295.90, 295.91, 295.92, 295.93, 295.94, 295.95),
+         bipolar = Icd9_code %in% c(296.00, 296.01, 296.02, 296.03, 296.04, 296.05, 296.06, 296.10, 296.11, 296.12, 296.13, 296.14, 296.15, 296.16, 296.40, 296.41, 296.42, 296.43, 296.44, 296.45, 296.46, 296.50, 296.51, 296.52, 296.53, 296.54, 296.55, 296.56, 296.60, 296.61, 296.62, 296.63, 296.64, 296.65, 296.66, 296.7, 296.80, 296.81, 296.82, 296.89, 296.90, 296.99)) %&gt;%
+  group_by(encounter_id) %&gt;%
+  summarise(bipolarSum = sum(bipolar),
+            schizophreniaSum = sum(schizophrenia))
+#merge all data
+encounter_joined &lt;- patient %&gt;% 
+  inner_join(encounter_flagged, by = &quot;patient_id&quot;) %&gt;%
+  inner_join(diagnosis_flagged, by = &quot;encounter_id&quot;) %&gt;%
+  group_by(patient_id) %&gt;%
+  summarise(TotalInpatient = sum(inpatient),
+            TotalOutpatient = sum(outpatient),
+            TotalED = sum(ED),
+            FlagBipolar = (sum(bipolarSum)&gt;0) %&gt;% as.numeric(),
+            FlagSchizophrenia = (sum(schizophreniaSum)&gt;0) %&gt;% as.numeric()) %&gt;% 
+  arrange(patient_id)
+
+encounter_joined </code></pre>
+<pre><code>## # A tibble: 920 x 6
+##    patient_id TotalInpatient TotalOutpatient TotalED FlagBipolar FlagSchizophrenia
+##         &lt;int&gt;          &lt;int&gt;           &lt;int&gt;   &lt;int&gt;       &lt;dbl&gt;             &lt;dbl&gt;
+##  1          1              1               0       0           0                 0
+##  2          2              1               0       0           0                 0
+##  3          3              0               1       0           0                 0
+##  4          4              0               0       2           0                 0
+##  5          5              0               0       1           0                 1
+##  6          6              1               0       2           0                 0
+##  7          7              2               1       0           0                 1
+##  8          8              0               0       2           0                 0
+##  9          9              1               1       0           0                 0
+## 10         10              1               0       0           0                 0
+## # ... with 910 more rows</code></pre>
+<pre class="r"><code>#the output looks identical to the SQL output. If the project requires, we can always output the data from SQL and compare with the data.frame in R</code></pre>
+</div>
+<div id="clean-up" class="section level2">
+<h2>Clean up</h2>
+<pre class="r"><code>#clean up database
 dbDisconnect(con)
 file.remove(tfile)</code></pre>
 <pre><code>## [1] TRUE</code></pre>
+<pre class="r"><code>#rmarkdown::render(&quot;simulate-analysis.Rmd&quot;)</code></pre>
 </div>
 
 

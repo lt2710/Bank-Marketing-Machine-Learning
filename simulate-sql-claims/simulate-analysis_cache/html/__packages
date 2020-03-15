@@ -11,3 +11,5 @@ stringr
 forcats
 RSQLite
 randomNames
+lubridate
+DBI
