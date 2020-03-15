@@ -6,5 +6,7 @@ Then use both R and SQL to achieve the same task:
 
 See: 
 [HTML report](https://github.com/lt2710/Pet-projects/blob/master/simulate-sql-claims/simulate-analysis-report.html)
+
 [R codes to simulate and analyze data](https://github.com/lt2710/Pet-projects/blob/master/simulate-sql-claims/simulate-and-make-analysisanalysis.R)
+
 [SQL](https://github.com/lt2710/Pet-projects/blob/master/simulate-sql-claims/make-analysis.sql)
