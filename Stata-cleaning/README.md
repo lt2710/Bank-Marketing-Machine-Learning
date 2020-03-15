@@ -10,3 +10,6 @@ For cases that do not meet these criteria, LTCH receives payment lower than its 
 Write a program in Stata that answers the following questions:
 
 •	What percent of cases discharged from a LTCH in 2016 met the new criteria?
+
+## Deliverable
+A [stata do file](https://github.com/lt2710/Pet-projects/blob/master/Stata-cleaning/Stata_data_preparation.do) to produce the desired calculation 
