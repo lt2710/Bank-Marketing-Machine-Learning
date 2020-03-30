@@ -1,5 +1,5 @@
-# 14WesTech_TCC
-Working repo for data science work at the Agora.
+# 14 Westech Visualization report
+A small directory extending from working repo for data science work at the Agora for demonstration purpose. 
 
 Deliverable: an automized visualization report on factors impacting retention and performance of employees in two international call centers
 
