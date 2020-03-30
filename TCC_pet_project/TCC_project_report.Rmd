@@ -1,0 +1,605 @@
+---
+title: "Attrition and Reasons"
+author: "Langyi Tian and Jay Souder"
+date: "July 2019"
+output:
+  xaringan::moon_reader:
+    css: ["default", "default-fonts", "custom_Xaringan.css"]
+    lib_dir: libs
+    keep_md: true
+    self_contained: false
+    nature:
+      ratio: 16:9
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      countdown: 120000
+editor_options: 
+  chunk_output_type: inline
+---
+exclude: true
+
+class: left, top
+background-size: 100%
+background-position: 50% 280%
+
+```{r setup, include=FALSE}
+rm(list = ls())#clear environment
+wd <- "~/GitHub/Pet-projects/TCC_pet_project/"#set working directory
+#Set up default knitr chunk options
+library("knitr")
+knitr::opts_chunk$set(
+  echo = FALSE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.height = 7,
+  fig.width = 15,
+  fig.align = "center",
+  cache = TRUE,
+  cache.lazy = FALSE
+)
+options(htmltools.dir.version = FALSE)
+```  
+
+```{r theme-map, include=FALSE}
+#set up theme map for presentation
+theme_simplemap <- function(base_size = 9,
+                            base_family = "") {
+  theme_bw(base_size = base_size, base_family = base_family) %+replace%
+    theme(
+      axis.line = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title = element_blank(),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0, "lines"),
+      plot.background = element_blank(),
+      legend.position = "none"
+    )
+}
+```
+
+```{r load packages}
+#load packages.
+packages <- c(
+  "pkgnet",
+  "praise",
+  "tidyverse",
+  "knitr",
+  "ggplot2",
+  "plotly",
+  "widgetframe",
+  "gridExtra",
+  "ggmap",
+  "RColorBrewer",
+  "jtools",
+  "ggstance",
+  "ggraph",
+  "igraph"
+)
+packages <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+#avoid func name conflict
+select<-dplyr::select
+```
+
+```{r paths}
+#fix token paths and system parameters
+tokens <- read.csv("tokens.csv",
+                   stringsAsFactors = FALSE)
+Sys.setenv(
+  #plotly
+  plotly_username = tokens$key[tokens$tokenname == "plotly_username"],
+  plotly_api_key = tokens$key[tokens$tokenname == "plotly_api_key"],
+  #aws s3
+  AWS_ACCESS_KEY_ID = tokens$key[tokens$tokenname == "AWS_ACCESS_KEY_ID"],
+  AWS_SECRET_ACCESS_KEY = tokens$key[tokens$tokenname == "AWS_ACCESS_KEY_ID"],
+  AWS_DEFAULT_REGION = "us-east-2"
+)
+```
+
+```{r}
+#import data
+#list all files in data storage
+dta_processed_list <-
+  list.files(
+    "dta_processed",
+    pattern = "*.RData",
+    full.names = TRUE
+  )
+#load them
+for (i in dta_processed_list){
+  load(i)
+}
+```
+
+---
+## Year Hired for Current TCC Population
+```{r current cohort, fig.height = 5, fig.width = 10, fig.align = "center"}
+#prepare data for pie chart on hiring
+pie_cohort <-
+  dta_merged %>%
+  filter(terminated == FALSE) %>% #active people
+  select(name, hire_date) %>% #keep name and time hired
+  mutate(
+    hire_date = hire_date %>%
+      as.Date() %>%
+      cut("year") %>%
+      as.character() %>%
+      str_extract("^[:digit:]{4}") #extract year of hire
+  ) %>%
+  group_by(hire_date) %>% #group people by year
+  summarise(freq = n())
+
+#make pie chart of current cohort
+plot_pie_cohort <-
+  ggplot(pie_cohort,
+         aes(x = "",
+             y = freq,
+             fill = hire_date)) +
+  #bar plot
+  geom_bar(stat = "identity",
+           color = "seashell4") +
+  #set text to be size of cohort
+  geom_text(
+    aes(label = paste(freq)),
+    color = "gray16",
+    position = position_stack(vjust = 0.5),
+    size = 5.5
+  ) +
+  coord_polar(theta = "y", start = 0) +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(caption = "Current size 187",
+       fill = "Year Hired") +
+  theme_void() +
+  theme(text = element_text(size = 20))
+
+plot_pie_cohort
+```
+
+ - A majority of the current population has less than 6 months of experience, and avg. QA score of 81%
+ 
+ - Agents hired before 2018 have an avg. QA score of 89% over time
+ 
+ - Effect on training, performance
+ 
+???
+
+ - Refresh audience about how young current population is, and resulting performance differences
+ - hiring several centers worth of agents
+
+---
+## A Few Groups Drive the Attrition Since 2018
+```{r fig.height = 7, fig.width = 15, fig.align = "center"}
+#make data on tenure by group
+tenure_by_group <-
+  dta_merged %>%
+  filter(is.na(group) == FALSE,
+         group != "Training") %>% #keep common groups
+  group_by(group, terminated) %>%
+  summarise(
+    num = n(),
+    qa_mean = mean(qa_mean, na.rm = TRUE),
+    tenure = mean(tenure, na.rm = TRUE)
+  ) %>% #summary performance and tenure by group
+  mutate(
+    num = ifelse(terminated == TRUE,
+                 num * -1,
+                 num),
+    terminated = terminated %>%
+      as.numeric() %>%
+      recode(`0` = "Active",
+             `1` = "Terminated")
+  ) #make settings for pyramid plot
+
+#plot pyramid plot
+plot_tenure_group <-
+  ggplot(tenure_by_group,
+         aes(
+           x = group %>% reorder(-num),
+           y = num,
+           fill = terminated
+         )) +
+  #make both sides of the pyramid
+  geom_bar(data = tenure_by_group %>%
+             filter(terminated == "Terminated"),
+           stat = "identity") +
+  geom_bar(data = tenure_by_group %>%
+             filter(terminated == "Active"),
+           stat = "identity") +
+  #set up axis
+  scale_y_continuous(breaks = seq(-100, 50, 5),
+                     labels = c(seq(100, 0,-5),
+                                seq(5, 50, 5))) +
+  #pretty the plot
+  scale_fill_brewer(palette = "Dark2",
+                    direction = 1) +
+  coord_flip(expand = TRUE) +
+  xlab("") +
+  ylab("") +
+  labs(fill = "Status") +
+  theme_classic() +
+  theme(text = element_text(size = 20))
+
+plot_tenure_group
+```
+
+???
+ - Care still making up most of the attrition
+ 
+---
+## Top Exiting Reasons in Client Groups
+```{r}
+#extract unique group names
+group_names <- dta_merged$group[is.na(dta_merged$group) == FALSE &
+                           dta_merged$group != "Training"] %>% unique()
+#a function loop to make plot showing top exiting reasons
+attrition_pie <- NULL
+for (i in group_names) {
+  #extract top exit reasons for each group
+  dta <- dta_merged %>%
+    filter(group == i,
+           is.na(reason_detail) == FALSE) %>%
+    group_by(reason = reason_detail) %>%
+    summarise(Freq = n()) %>%
+    arrange(-Freq) %>%
+    top_n(3)
+  #make the pie plot
+  attrition_pie[[i]] <- ggplot(dta,
+                               aes(
+                                 x = "",
+                                 y = Freq,
+                                 fill = reason %>%
+                                   fct_reorder(Freq, .fun = max)
+                               )) +
+    geom_bar(stat = "identity",
+             color = "seashell4") +
+    #visualize the reason on plot
+    geom_text(
+      aes(label = paste(Freq)),
+      color = "gray16",
+      position = position_stack(vjust = 0.5),
+      size = 5.5
+    ) +
+    #pit chart settings
+    coord_polar(theta = "y",
+                start = 0) +
+    scale_fill_brewer(palette = "YlOrRd",
+                      direction = 1,
+                      labels = dta$reason) +
+    labs(caption = paste(i),
+         fill = "") +
+    theme_void() +
+    theme(text = element_text(size = 15))
+}
+#arrange pie plot for all groups
+grid.arrange(
+  attrition_pie[[1]],
+  attrition_pie[[2]],
+  attrition_pie[[3]],
+  attrition_pie[[4]],
+  attrition_pie[[5]],
+  attrition_pie[[6]],
+  attrition_pie[[8]],
+  attrition_pie[[9]],
+  attrition_pie[[10]]
+)
+
+```
+
+
+ - See Appendix 1 for an interactive breakdown of terminated agents
+
+???
+ - Consistent theme in leaving reasons: QA performance, job abandonment
+ - Banyan has positive attrition, which is what we want to see
+
+---
+ 
+
+##Factors Impacting Senior Agents' Tenure
+```{r}
+#modeling
+#make a formula to try
+tenure_formulate<-formula(tenure ~ age + gender + commute_time + qa_mean_w4 + min + gap + supe)
+#model for senior agents
+lm_old <-
+  lm(tenure_formulate,
+     data = dta_merged %>% 
+       filter(hire_date %>% 
+                as.Date() < "2018-01-01"))
+#model for new agents
+lm_new <-
+  lm(tenure_formulate,
+     data = dta_merged %>% 
+       filter(hire_date %>% 
+                as.Date() > "2018-01-01"))
+```
+
+ - Senior agents average profile: 89% on tenure QA, 30 months of tenure
+
+```{r, fig.height = 4, fig.width = 15, fig.align = "center"}
+#visualize coefficients on demographics
+jtools::plot_summs(
+  lm_old,
+  lm_new,
+  coefs = c(
+    "Commute time (min)" = "commute_time",
+    "Agent age (year)" = "age",
+    "QA Average in first 4 weeks (point)" = "qa_mean_w4",
+    "Tenure QA lowest score (point)" = "min",
+    "Largest successive decline in QA (point)" = "gap"
+  ),
+  legend.title = "Population",
+  model.names = c("Senior agents",
+                  "New hires"),
+  
+  ci_level = 0.5) +
+  scale_x_continuous(breaks = seq(-1.5, 2, by = 0.5)) +
+  xlab("Additional impact on agent tenure (month)") +
+  ylab("") +
+  theme_classic() +
+  theme(text = element_text(size = 20))
+```
+
+???
+Look at factors impacting tenure, diferent in the life cycle of agents 
+
+ - Overall, at early stage of tenure supervisors are decisive to agents' period to stay.
+ 
+ - Agent stays longer in the company had supervisor's effect decreases and other factors showing effect.
+ 
+Senior agents first.
+
+ - Profile: 89% on tenure QA, 30 months of tenure
+
+ - Commute time: Each additional 10 mins bring down tenure by 2.5 month for senior agents
+
+ - Age: additional 4 years in age would add 3 months to likelihood to stay than younger counterparts
+ 
+  - Potential ask: how does the age fit with the push to hire young people?
+
+ - QA: Senior agents with better performance in their early tenure and consistency in scores tend to stay longer
+ 
+ - Past profile does not exactly have to apply (older agents)
+ 
+Rather, these factors are not influential for new hires
+
+---
+ 
+
+##Supervisors' Influence on New Hires' Tenure
+ - New hires average profile: 83% on tenure QA, 3 months of tenure
+```{r, fig.height = 7, fig.width = 15, fig.align = "center"}
+#visualize coefficients on supervisors
+jtools::plot_summs(
+  lm_old,
+  lm_new,
+  coefs = c(
+    "Male agents (compared with female)" = "genderM",
+    "Ariel Stillman" = "supeAriel Stillman",
+    "Carla Martin" = "supeCarla Martin",
+    "Devon Gilliam" = "supeDevon Gilliam",
+    "Donovan Tucker" = "supeDonovan Tucker",
+    "Gia Weinberger" = "supeGia Weinberger",
+    "Jeff Mahady" = "supeJeff Mahady",
+    "Marie Jenkins" = "supeMarie Jenkins",
+    "Megan Stanko" = "supeMegan Stanko",
+    "Naila Butt" = "supeNaila Butt",
+    "Ray Davis" = "supeRay Davis",
+    "Shamala Turner" = "supeShamala Turner"
+  ),
+  legend.title = "Population",
+  model.names = c("Senior agents",
+                  "New hires"),
+  
+  ci_level = 0.5) +
+  scale_x_continuous(breaks = seq(-40, 20, by = 5)) +
+  labs(caption = "All supervisors compared with Alison Herman") +
+  xlab("Additional impact on agent tenure (month)") +
+  ylab("") +
+  theme_classic() +
+  theme(text = element_text(size = 20))
+```
+
+???
+
+Clear predictors of new-hire tenure: Supervisor
+ 
+ - Difference can be 6 months on average on everyone, even after considering agents have different QA, age, commute time...
+ 
+ - Short and precise dots for new hires show the effects are significant across all supervisors
+
+After longer tenure, the effect from supervisors are reduced
+ 
+ - Next findings give an overview
+
+---
+ 
+
+##Certain Supervisors Are Better at Retaining Agents
+```{r fig.height = 7, fig.width = 15, fig.align = "center"}
+#make data for plotting tenure against supverisor
+qa_supe <-
+  dta_merged %>%
+  filter(is.na(supe) == FALSE,
+         hire_date %>% as.Date() > "2018-01-01") %>%  #keep only agent staying relatively for long
+  mutate(terminated = terminated %>%
+           as.numeric() %>%
+           recode(`0` = "Active",
+                  `1` = "Terminated"))  #minor change on terminate label
+#make tenure labels with numbers
+#extract average performance and tenure under each supervisor
+tenures <-
+  qa_supe %>%
+  group_by(supe) %>%
+  summarise(tenure = tenure %>% median(na.rm = TRUE),
+            qa_mean = qa_mean %>% median(na.rm = TRUE)) %>%
+  arrange(tenure) %>%
+  mutate(label = paste(supe,
+                       ": ",
+                       tenure %>%
+                         round(digits = 1)))#make the number their label
+#set plot properties
+colourCount <- length(unique(qa_supe$supe))
+getPalette <- colorRampPalette(brewer.pal(9, "RdBu"))
+#make plot
+plot_tenure_supe_box <- ggplot(
+  qa_supe,
+  aes(
+    x = supe %>%
+      fct_reorder(tenure, .fun = median),#recorder by supervisor names by median tenure
+    y = tenure,
+    fill = supe %>%
+      fct_reorder(tenure, .fun = median),
+    color = terminated
+  )
+) +
+  #make box plot
+  geom_boxplot(color = "black",
+               outlier.shape = NA) +
+  scale_fill_manual(values = getPalette(colourCount),
+                    labels = tenures$label) +
+  xlab("") +
+  ylab("Average Tenure") +
+  labs(color = "Status",
+       fill = "Average Tenure",
+       caption = "Agents hired after 2018-01-01") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+plot_tenure_supe_box +
+  theme(text = element_text(size = 20)) +
+  geom_jitter()
+```
+
+
+```{r}
+#make interactive plot
+plot_tenure_supe_box <- 
+  plot_tenure_supe_box +
+  #add additional label in interactive plot
+  geom_jitter(size = 1,
+              aes(
+                text = paste(name,"\n",
+                  "Age: ",age %>% round(digits = 0),"\n",
+                  "Group: ",group,"\n",
+                  "Supervisor: ",supe,
+                  "(",supe_time,"months total)","\n",
+                  "Hired at: ",hire_date,"\n",
+                  "Status: ",terminated,"\n",
+                  "Tenure QA:",qa_mean %>% round(digits = 0),"%","\n",
+                  "Tenure: ",tenure %>% round(digits = 1),"months","\n",
+                  "Reason: ",reason_detail,"\n",
+                  "---raw codes below-------------"
+                )
+              )) +
+  theme(legend.position = 'none')
+#make plotly chart and return api
+plot_tenure_supe_box_api <- api_create(
+  plot_tenure_supe_box %>%
+    plotly::ggplotly(height = 400,
+                     width = 1100),
+  filename = "plot_tenure_supe_box",
+  sharing = "secret"
+)
+#attach plotly link to the slide
+cat(paste(
+  "Interactive plot at",
+  paste(
+    plot_tenure_supe_box_api$web_url %>% str_replace("/$", "?share_key="),
+    plot_tenure_supe_box_api$share_key,
+    sep = ""
+  )
+))
+```
+
+???
+
+ - This is for agents hired after 1-1-2018
+
+ - The gap can be as large as 6 months
+ 
+Ask: what do good supervisors do differently than low performing supes for retaining agents?
+ 
+ - More active people over the right, which is desirable
+ 
+ - Interactive plot available with agent profiles
+
+---
+ 
+
+##Target Recruitment Efforts Geographically
+
+```{r commute distance, message=FALSE, warning=FALSE, echo=FALSE, fig.height = 7, fig.width = 15, fig.align = "center"}
+#make commute data
+commute <-
+  dta_merged %>%
+  mutate(old = tenure > 10) %>% 
+  group_by(commute_start) %>%
+  summarise(
+    num = n(),
+    old = 100 * sum(old, na.rm = TRUE) / n(),
+    commute_time = mean(commute_time, na.rm = TRUE),
+    tenure = mean(tenure, na.rm = TRUE),
+    mode = commute_mode[1]
+  ) %>% #make some variables
+  #replace some wrongly specified names
+  mutate(commute_start = commute_start %>% 
+           str_replace_all("COCKYSVIL", "Cockeysville") %>%
+           str_replace_all("LUTHVLE TIMON", "Lutherville-Timonium")
+         )
+#make commute plot
+plot_commute <- ggplot(
+  commute %>%
+    filter(commute_time < 100,
+           tenure < 30,
+           is.na(mode) == FALSE),
+  aes(
+    x = commute_time,
+    y = tenure,
+    size = num,
+    color = old,
+    text = commute_start
+  )
+) +
+  geom_point() +
+  #display city names with good population and good tenure
+  geom_text(
+    data = commute %>% filter(num > 10 | (commute_time < 20 & tenure < 30 & tenure > 10)),
+    aes(label = commute_start),
+    position = position_jitter(width = 0.1, height = 0.1),
+    color = "black",
+    size = 4,
+    hjust = -0.2,
+    vjust = -0.2
+  ) +
+  #pretty the plot
+  scale_size_continuous(range = c(1.5, 25),
+                        guide = "none") +
+  scale_color_gradient(low = "darkseagreen1", high = "cyan4") +
+  xlab("Commute time (minutes)") +
+  ylab("Tenure (months)") +
+  labs(color = "% agents > 10 mo") +
+  theme_classic() +
+  theme(text = element_text(size = 20))
+
+plot_commute
+```
+
+???
+ - Considerable sample is from Baltimore City, with long commute time and undesirable avg. tenure
+ 
+ - Rather, those who take less than half an hour to work tend to stay longer
+ 
+ - Add value in other ways rather college concentration

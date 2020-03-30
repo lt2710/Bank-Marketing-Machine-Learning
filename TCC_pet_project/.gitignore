@@ -1,0 +1,6 @@
+*.RData
+*.zip
+*.csv
+TCC_project_report_files/
+TCC_project_report_cache/
+libs/

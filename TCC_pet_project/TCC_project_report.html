@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Attrition and Reasons</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Langyi Tian and Jay Souder" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="custom_Xaringan.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Attrition and Reasons
+### Langyi Tian and Jay Souder
+### July 2019
+
+---
+
+exclude: true
+
+class: left, top
+background-size: 100%
+background-position: 50% 280%
+
+
+
+
+
+
+
+
+
+
+
+---
+## Year Hired for Current TCC Population
+&lt;img src="TCC_project_report_files/figure-html/current cohort-1.png" style="display: block; margin: auto;" /&gt;
+
+ - A majority of the current population has less than 6 months of experience, and avg. QA score of 81%
+ 
+ - Agents hired before 2018 have an avg. QA score of 89% over time
+ 
+ - Effect on training, performance
+ 
+???
+
+ - Refresh audience about how young current population is, and resulting performance differences
+ - hiring several centers worth of agents
+
+---
+## A Few Groups Drive the Attrition Since 2018
+&lt;img src="TCC_project_report_files/figure-html/unnamed-chunk-2-1.png" style="display: block; margin: auto;" /&gt;
+
+???
+ - Care still making up most of the attrition
+ 
+---
+## Top Exiting Reasons in Client Groups
+&lt;img src="TCC_project_report_files/figure-html/unnamed-chunk-3-1.png" style="display: block; margin: auto;" /&gt;
+
+
+ - See Appendix 1 for an interactive breakdown of terminated agents
+
+???
+ - Consistent theme in leaving reasons: QA performance, job abandonment
+ - Banyan has positive attrition, which is what we want to see
+
+---
+ 
+
+##Factors Impacting Senior Agents' Tenure
+
+
+ - Senior agents average profile: 89% on tenure QA, 30 months of tenure
+
+&lt;img src="TCC_project_report_files/figure-html/unnamed-chunk-5-1.png" style="display: block; margin: auto;" /&gt;
+
+???
+Look at factors impacting tenure, diferent in the life cycle of agents 
+
+ - Overall, at early stage of tenure supervisors are decisive to agents' period to stay.
+ 
+ - Agent stays longer in the company had supervisor's effect decreases and other factors showing effect.
+ 
+Senior agents first.
+
+ - Profile: 89% on tenure QA, 30 months of tenure
+
+ - Commute time: Each additional 10 mins bring down tenure by 2.5 month for senior agents
+
+ - Age: additional 4 years in age would add 3 months to likelihood to stay than younger counterparts
+ 
+  - Potential ask: how does the age fit with the push to hire young people?
+
+ - QA: Senior agents with better performance in their early tenure and consistency in scores tend to stay longer
+ 
+ - Past profile does not exactly have to apply (older agents)
+ 
+Rather, these factors are not influential for new hires
+
+---
+ 
+
+##Supervisors' Influence on New Hires' Tenure
+ - New hires average profile: 83% on tenure QA, 3 months of tenure
+&lt;img src="TCC_project_report_files/figure-html/unnamed-chunk-6-1.png" style="display: block; margin: auto;" /&gt;
+
+???
+
+Clear predictors of new-hire tenure: Supervisor
+ 
+ - Difference can be 6 months on average on everyone, even after considering agents have different QA, age, commute time...
+ 
+ - Short and precise dots for new hires show the effects are significant across all supervisors
+
+After longer tenure, the effect from supervisors are reduced
+ 
+ - Next findings give an overview
+
+---
+ 
+
+##Certain Supervisors Are Better at Retaining Agents
+&lt;img src="TCC_project_report_files/figure-html/unnamed-chunk-7-1.png" style="display: block; margin: auto;" /&gt;
+
+
+
+```
+## Interactive plot at https://plotly.com/~tly371/13?share_key=GrI06wPBrI80AdBvmhHtcE
+```
+
+???
+
+ - This is for agents hired after 1-1-2018
+
+ - The gap can be as large as 6 months
+ 
+Ask: what do good supervisors do differently than low performing supes for retaining agents?
+ 
+ - More active people over the right, which is desirable
+ 
+ - Interactive plot available with agent profiles
+
+---
+ 
+
+##Target Recruitment Efforts Geographically
+
+&lt;img src="TCC_project_report_files/figure-html/commute distance-1.png" style="display: block; margin: auto;" /&gt;
+
+???
+ - Considerable sample is from Baltimore City, with long commute time and undesirable avg. tenure
+ 
+ - Rather, those who take less than half an hour to work tend to stay longer
+ 
+ - Add value in other ways rather college concentration
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function(time) {
+  var d2 = function(number) {
+    return ('0' + number).slice(-2); // left-pad 0 to minutes/seconds
+  },
+
+  time_format = function(total) {
+    var secs = Math.abs(total) / 1000;
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor(secs % 3600 / 60);
+    var s = Math.round(secs % 60);
+    var res = d2(m) + ':' + d2(s);
+    if (h > 0) res = h + ':' + res;
+    return res;  // [hh:]mm:ss
+  },
+
+  slide_number_div = function(i) {
+    return document.getElementsByClassName('remark-slide-number').item(i);
+  },
+
+  current_page_number = function(i) {
+    return slide_number_div(i).firstChild.textContent;  // text "i / N"
+  };
+
+  var timer = document.createElement('span'); timer.id = 'slide-time-left';
+  var time_left = time, k = slideshow.getCurrentSlideIndex(),
+      last_page_number = current_page_number(k);
+
+  setInterval(function() {
+    time_left = time_left - 1000;
+    timer.innerHTML = ' ' + time_format(time_left);
+    if (time_left < 0) timer.style.color = 'red';
+  }, 1000);
+
+  slide_number_div(k).appendChild(timer);
+
+  slideshow.on('showSlide', function(slide) {
+    var i = slide.getSlideIndex(), n = current_page_number(i);
+    // reset timer when a new slide is shown and the page number is changed
+    if (last_page_number !== n) {
+      time_left = time; last_page_number = n;
+      timer.innerHTML = ' ' + time_format(time); timer.style.color = null;
+    }
+    slide_number_div(i).appendChild(timer);
+  });
+})(120000);
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
