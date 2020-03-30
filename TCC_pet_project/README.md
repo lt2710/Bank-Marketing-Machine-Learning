@@ -5,4 +5,4 @@ Deliverable: an automized visualization report on factors impacting retention an
 
 Presented to HR Director, middle managers and President in summer 2019. 
 
-(PDF report)[https://github.com/lt2710/Pet-projects/blob/master/TCC_pet_project/TCC_project_report.pdf]
+(PDF report) [https://github.com/lt2710/Pet-projects/blob/master/TCC_pet_project/TCC_project_report.pdf]
